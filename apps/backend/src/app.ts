@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import pool from "./config/database.js";
+import userRoutes from "./routes/user.routes.js";
+import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 
 dotenv.config();
 
@@ -13,6 +15,11 @@ app.use(cors());
 app.get("/", (req, res) => {
   res.send("E-learning API running...");
 });
+
+app.use("/api/users", userRoutes);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
