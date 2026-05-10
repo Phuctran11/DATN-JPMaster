@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "test:course": "node --loader ts-node/esm test-course.ts",
+    "test:flashcard": "node --loader ts-node/esm test-flashcard.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import pool from "./config/database.js";
 import userRoutes from "./routes/user.routes.js";
 import courseRoutes from "./routes/course.routes.js";
+import flashcardRoutes from "./routes/flashcard.routes.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 
 dotenv.config();
@@ -19,6 +20,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/users", userRoutes);
 app.use("/api/courses", courseRoutes);
+app.use("/api/flashcards", flashcardRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
