@@ -6,6 +6,73 @@ type UserRole = "guest" | "learner" | "admin";
 const VALID_ROLES: UserRole[] = ["guest", "learner", "admin"];
 
 export class UserController {
+  async googleLogin(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        return res.status(400).json({ error: 'Token is required' });
+      }
+
+      // Decode JWT token from Google (without verification for now)
+      // In production, verify the token with Google's API
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      const googleData = JSON.parse(jsonPayload);
+
+      if (!googleData.email) {
+        return res.status(400).json({ error: 'Invalid token' });
+      }
+
+      const email = googleData.email;
+      const username = googleData.name || email.split('@')[0];
+
+      let user = await userModel.getUserByEmail(email);
+
+      if (!user) {
+        // Create new user from Google
+        const passwordHash = await passwordService.hashPassword(`google_oauth_${Date.now()}`);
+        user = await userModel.createUser(username, email, passwordHash, 'learner');
+      }
+
+      const { password_hash, ...userWithoutPassword } = user;
+      return res.status(200).json({ message: 'Google login successful', data: userWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async login(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "email and password are required" });
+      }
+
+      const user = await userModel.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const isPasswordValid = await passwordService.comparePassword(password, user.password_hash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const { password_hash, ...userWithoutPassword } = user;
+      return res.status(200).json({ message: "Login successful", data: userWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createUser(req: Request, res: Response, next: NextFunction) {
     try {
       const { username, email, password, role = "learner" } = req.body;

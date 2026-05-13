@@ -12,7 +12,7 @@ export function Button({
   className = '',
   ...props
 }: ButtonProps) {
-  const baseStyles = 'font-headline-sm text-headline-sm transition-all active:scale-95';
+  const baseStyles = 'font-headline-sm text-headline-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100';
 
   const variants = {
     primary: 'bg-primary text-on-primary hover:shadow-lg hover:shadow-primary/20',

@@ -1,4 +1,26 @@
+import { SocialLinks, FooterLinkColumn } from './ui';
+
 export function Footer() {
+  const socialLinks = [
+    { icon: 'public', url: '#', label: 'Website' },
+    { icon: 'chat_bubble', url: '#', label: 'Chat' },
+    { icon: 'alternate_email', url: '#', label: 'Email' },
+  ];
+
+  const platformLinks = [
+    { label: 'All Courses', url: '#' },
+    { label: 'Flashcards', url: '#' },
+    { label: 'Mock Tests', url: '#' },
+    { label: 'JLPT Guide', url: '#' },
+  ];
+
+  const aboutLinks = [
+    { label: 'Our Story', url: '#' },
+    { label: 'Careers', url: '#' },
+    { label: 'Privacy Policy', url: '#' },
+    { label: 'Terms of Service', url: '#' },
+  ];
+
   return (
     <footer className="bg-surface-container-low border-t border-outline-variant/50 relative">
       <div className="max-w-[1280px] mx-auto px-margin-desktop py-20">
@@ -9,40 +31,12 @@ export function Footer() {
             <p className="text-label-md font-inter text-on-surface-variant leading-relaxed">
               Setting the global standard for academic Japanese education through technology and discipline.
             </p>
-            <div className="flex gap-4">
-              <a href="#" className="w-10 h-10 rounded-full bg-white border border-outline-variant flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
-                <span className="material-symbols-outlined text-xl">public</span>
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white border border-outline-variant flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
-                <span className="material-symbols-outlined text-xl">chat_bubble</span>
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white border border-outline-variant flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
-                <span className="material-symbols-outlined text-xl">alternate_email</span>
-              </a>
-            </div>
+            <SocialLinks links={socialLinks} size="md" />
           </div>
 
-          {/* Links Column 1 */}
-          <div className="space-y-6">
-            <h5 className="font-bold text-primary uppercase tracking-wider text-xs">Platform</h5>
-            <ul className="space-y-3">
-              <li><a href="#" className="font-inter text-label-md text-on-surface-variant hover:text-primary transition-all">All Courses</a></li>
-              <li><a href="#" className="font-inter text-label-md text-on-surface-variant hover:text-primary transition-all">Flashcards</a></li>
-              <li><a href="#" className="font-inter text-label-md text-on-surface-variant hover:text-primary transition-all">Mock Tests</a></li>
-              <li><a href="#" className="font-inter text-label-md text-on-surface-variant hover:text-primary transition-all">JLPT Guide</a></li>
-            </ul>
-          </div>
-
-          {/* Links Column 2 */}
-          <div className="space-y-6">
-            <h5 className="font-bold text-primary uppercase tracking-wider text-xs">About</h5>
-            <ul className="space-y-3">
-              <li><a href="#" className="font-inter text-label-md text-on-surface-variant hover:text-primary transition-all">Our Story</a></li>
-              <li><a href="#" className="font-inter text-label-md text-on-surface-variant hover:text-primary transition-all">Careers</a></li>
-              <li><a href="#" className="font-inter text-label-md text-on-surface-variant hover:text-primary transition-all">Privacy Policy</a></li>
-              <li><a href="#" className="font-inter text-label-md text-on-surface-variant hover:text-primary transition-all">Terms of Service</a></li>
-            </ul>
-          </div>
+          {/* Links Columns */}
+          <FooterLinkColumn title="Platform" links={platformLinks} />
+          <FooterLinkColumn title="About" links={aboutLinks} />
 
           {/* Contact Column */}
           <div className="space-y-6">

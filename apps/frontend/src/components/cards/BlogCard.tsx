@@ -1,4 +1,4 @@
-import { Card } from '../ui';
+import { Card, ImageCard, CategoryBadge } from '../ui';
 import { Heading, Text } from '../ui/Typography';
 
 interface BlogCardProps {
@@ -12,23 +12,19 @@ interface BlogCardProps {
 
 export function BlogCard({ title, category, date, image, excerpt, link }: BlogCardProps) {
   return (
-    <Card className="bg-surface border border-outline-variant rounded-xl overflow-hidden transition-all hover:shadow-lg duration-300">
-      <div className="h-48 overflow-hidden">
-        <img
-          alt={title}
-          className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-          src={image}
-        />
+    <Card className="bg-surface border border-outline-variant rounded-xl overflow-hidden transition-all hover:shadow-lg duration-300 flex flex-col">
+      <div className="group">
+        <ImageCard src={image} alt={title} hoverScale={105} />
       </div>
-      <div className="p-stack-md">
-        <span className="text-primary font-label-md text-label-md mb-2 block">{category}</span>
+      <div className="p-stack-md flex flex-col flex-grow">
+        <CategoryBadge category={category} variant="primary" className="mb-2 w-fit" />
         <Heading level="h3" size="headline-md" className="text-on-surface mb-stack-sm">
           {title}
         </Heading>
-        <Text variant="body-md" color="on-surface-variant" className="mb-stack-md line-clamp-2">
+        <Text variant="body-md" color="on-surface-variant" className="mb-stack-md line-clamp-2 flex-grow">
           {excerpt}
         </Text>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-auto">
           <span className="text-outline text-label-md">{date}</span>
           <a href={link} className="text-primary font-label-md text-label-md hover:underline">
             Read More
@@ -53,16 +49,14 @@ export function FeaturedBlogCard({
 }: FeaturedBlogCardProps) {
   return (
     <article className="md:col-span-8 group bg-surface border border-outline-variant rounded-xl overflow-hidden flex flex-col md:flex-row transition-all hover:shadow-lg">
-      <div className="md:w-1/2 relative h-64 md:h-auto overflow-hidden">
-        <img alt={title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src={image} />
-        <div className="absolute top-4 left-4">
-          <span className="bg-secondary-container text-on-secondary-container px-3 py-1 rounded text-label-md font-label-md">
-            FEATURED
-          </span>
+      <div className="md:w-1/2 relative h-64 md:h-auto">
+        <ImageCard src={image} alt={title} hoverScale={105} />
+        <div className="absolute top-4 left-4 z-10">
+          <CategoryBadge category="FEATURED" variant="featured" />
         </div>
       </div>
       <div className="md:w-1/2 p-stack-lg flex flex-col justify-center">
-        <span className="text-primary font-label-md text-label-md mb-stack-sm">{category}</span>
+        <CategoryBadge category={category} variant="primary" className="mb-stack-sm w-fit" />
         <h2 className="font-headline-lg text-headline-lg text-on-surface mb-stack-md group-hover:text-primary transition-colors">
           {title}
         </h2>

@@ -1,24 +1,53 @@
 import { useState } from 'react';
-import { Input, Select, Button, GlassCard, Icon } from '../components';
+import { useNavigate } from 'react-router-dom';
+import { Input, Button, GlassCard, Icon, PasswordInput } from '../components';
 import { Heading, Text } from '../components/ui/Typography';
+import { authAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { useForm } from '../hooks/useForm';
+import { validators } from '../utils/validators';
 
 function SignupForm() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    level: 'beginner',
-    password: '',
-    confirmPassword: '',
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const { addToast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  const { formData, errors, handleChange, validate } = useForm({
+    initialValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+    onValidate: (values) => ({
+      name: validators.name(values.name),
+      email: validators.email(values.email),
+      password: validators.password(values.password),
+      confirmPassword: validators.confirmPassword(values.password, values.confirmPassword),
+    }),
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Signup:', formData);
+    if (!validate()) return;
+
+    setLoading(true);
+    try {
+      const response = await authAPI.signup({
+        username: formData.name,
+        email: formData.email,
+        password: formData.password,
+      });
+      login(response.data);
+      addToast('Account created successfully!', 'success');
+      navigate('/');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Sign up failed', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -27,61 +56,59 @@ function SignupForm() {
         id="name"
         label="Full Name"
         type="text"
-        placeholder="Yukio Mishima"
+        placeholder="John Doe"
         value={formData.name}
         onChange={handleChange}
+        disabled={loading}
+        error={errors.name}
       />
 
       <Input
         id="email"
-        label="Email Address"
+        label="Email"
         type="email"
-        placeholder="student@jpmaster.edu"
+        placeholder="student@example.com"
         value={formData.email}
         onChange={handleChange}
-      />
-
-      <Select
-        id="level"
-        label="Student Level"
-        value={formData.level}
-        onChange={handleChange}
-        options={[
-          { value: 'beginner', label: 'Beginner (N5/N4)' },
-          { value: 'intermediate', label: 'Intermediate (N3/N2)' },
-          { value: 'advanced', label: 'Advanced (N1)' },
-        ]}
+        disabled={loading}
+        error={errors.email}
       />
 
       {/* Password Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
-        <Input
+        <PasswordInput
           id="password"
           label="Password"
-          type="password"
           value={formData.password}
           onChange={handleChange}
+          disabled={loading}
+          error={errors.password}
         />
-        <Input
+        <PasswordInput
           id="confirmPassword"
           label="Confirm Password"
-          type="password"
           value={formData.confirmPassword}
           onChange={handleChange}
+          disabled={loading}
+          error={errors.confirmPassword}
         />
       </div>
 
-      <Button type="submit" className="w-full mt-stack-lg flex items-center justify-center gap-2 group">
-        Create Account
+      <Button type="submit" className="w-full mt-stack-lg flex items-center justify-center gap-2 group" disabled={loading}>
+        {loading ? 'Creating account...' : 'Create Account'}
         <Icon name="arrow_right_alt" size="md" />
       </Button>
 
       <div className="pt-stack-md text-center">
         <Text variant="body-md" color="on-surface-variant">
           Already have an account?{' '}
-          <a href="#" className="text-primary font-semibold hover:underline underline-offset-4">
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="text-primary font-semibold hover:underline underline-offset-4"
+          >
             Login
-          </a>
+          </button>
         </Text>
       </div>
     </form>
@@ -155,8 +182,8 @@ export default function Signup() {
       <SignupDecorations />
 
       {/* Registration Container */}
-      <div className="container mx-auto px-margin-mobile md:px-margin-desktop flex justify-center lg:justify-start relative z-10">
-        <GlassCard className="w-full max-w-[520px] p-stack-lg md:p-12 rounded-xl shadow-lg">
+      <div className="w-full flex justify-center relative z-10">
+        <GlassCard className="w-full mx-margin-mobile md:mx-margin-desktop max-w-[520px] p-stack-lg md:p-12 rounded-xl shadow-lg">
           <div className="mb-stack-lg">
             <Heading level="h1" size="headline-lg" className="mb-2">
               Master the Art of Japanese

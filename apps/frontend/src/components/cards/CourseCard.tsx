@@ -1,4 +1,4 @@
-import { Card } from '../ui';
+import { Card, ImageCard, ProgressBar, StatusBadge } from '../ui';
 import { Heading, Text } from '../ui/Typography';
 import { Button } from '../Button';
 import { Icon } from '../ui';
@@ -6,22 +6,18 @@ import { Icon } from '../ui';
 interface MyLearningCardProps {
   title: string;
   progress: number;
-  status: 'In Progress' | 'Completed';
+  status: 'In Progress' | 'Completed' | 'Not Started';
   description: string;
   image: string;
 }
 
 export function MyLearningCard({ title, progress, status, description, image }: MyLearningCardProps) {
   return (
-    <Card className="p-6 flex flex-col h-full group">
-      <div className="relative mb-stack-md overflow-hidden rounded">
-        <img
-          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
-          src={image}
-          alt={title}
-        />
-        <div className="absolute top-2 right-2 bg-secondary text-on-secondary px-3 py-1 rounded text-[12px] font-bold">
-          {status}
+    <Card className="p-6 flex flex-col h-full">
+      <div className="relative mb-stack-md group">
+        <ImageCard src={image} alt={title} hoverScale={105} rounded="md" />
+        <div className="absolute top-2 right-2 z-10">
+          <StatusBadge status={status} />
         </div>
       </div>
       <Heading level="h3" size="headline-sm" className="mb-2">
@@ -31,18 +27,8 @@ export function MyLearningCard({ title, progress, status, description, image }: 
         {description}
       </Text>
       <div className="mt-auto">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-label-md text-outline">{progress}% Complete</span>
-        </div>
-        <div className="w-full h-1 bg-surface-container-high rounded-full mb-6">
-          <div
-            className="h-full bg-primary rounded-full relative"
-            style={{ width: `${progress}%` }}
-          >
-            <div className="absolute -right-1 -top-1 w-3 h-3 bg-secondary-fixed-dim rounded-full shadow-sm"></div>
-          </div>
-        </div>
-        <Button className="w-full">Continue</Button>
+        <ProgressBar value={progress} showLabel variant="default" />
+        <Button className="w-full mt-6">Continue</Button>
       </div>
     </Card>
   );
@@ -58,16 +44,16 @@ interface CourseGridCardProps {
 export function CourseGridCard({ title, price, image, level }: CourseGridCardProps) {
   return (
     <Card className="flex flex-col group">
-      <div className="aspect-square bg-surface-container rounded-lg mb-6 overflow-hidden relative">
-        <img
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+      <div className="mb-6">
+        <ImageCard
           src={image}
           alt={title}
+          badge={{ label: level, variant: 'glass' }}
+          overlay={{ gradient: true }}
+          aspectRatio="square"
+          hoverScale={110}
+          rounded="lg"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-        <span className="absolute bottom-4 left-4 bg-white/20 backdrop-blur-md px-3 py-1 rounded text-white text-[12px] font-bold">
-          {level}
-        </span>
       </div>
       <Heading level="h4" size="headline-sm" className="mb-2">
         {title}

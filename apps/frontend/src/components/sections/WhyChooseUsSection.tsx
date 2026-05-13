@@ -1,17 +1,5 @@
-import { GlassCard, Container, Section } from '../ui';
+import { GlassCard, Container, Section, FloatingCard, FeatureItem } from '../ui';
 import { Heading, Text } from '../ui/Typography';
-
-function FloatingCard({ icon, title, description, top, left }: { icon: string; title: string; description: string; top: string; left: string }) {
-  return (
-    <div className={`absolute ${top} ${left} glass-card p-4 rounded-2xl shadow-xl w-48 hidden md:block animate-bounce-subtle`}>
-      <span className="material-symbols-outlined text-secondary bg-secondary/10 p-2 rounded-lg mb-2">
-        {icon}
-      </span>
-      <div className="font-bold text-primary">{title}</div>
-      <p className="text-xs text-on-surface-variant">{description}</p>
-    </div>
-  );
-}
 
 function WhyChooseUsImage() {
   return (
@@ -28,15 +16,13 @@ function WhyChooseUsImage() {
         icon="verified"
         title="University Certified"
         description="Curriculum standard"
-        top="top-10"
-        left="-right-12"
+        position={{ top: 'top-10', right: '-right-12' }}
       />
       <FloatingCard
         icon="auto_awesome"
         title="Smart Flashcards"
         description="AI-powered SRS"
-        top="bottom-20"
-        left="-left-12"
+        position={{ bottom: 'bottom-20', left: '-left-12' }}
       />
     </div>
   );
@@ -58,24 +44,18 @@ function WhyChooseUsContent() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div className="flex gap-4">
-          <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
-            <span className="material-symbols-outlined">menu_book</span>
-          </div>
-          <div>
-            <h4 className="font-bold text-primary">Structured Path</h4>
-            <p className="text-sm text-on-surface-variant">N5 to N1 JLPT mastery</p>
-          </div>
-        </div>
-        <div className="flex gap-4">
-          <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-secondary/5 flex items-center justify-center text-secondary">
-            <span className="material-symbols-outlined">group</span>
-          </div>
-          <div>
-            <h4 className="font-bold text-primary">Native Mentors</h4>
-            <p className="text-sm text-on-surface-variant">Real-world practice</p>
-          </div>
-        </div>
+        <FeatureItem
+          icon="menu_book"
+          title="Structured Path"
+          description="N5 to N1 JLPT mastery"
+          variant="primary"
+        />
+        <FeatureItem
+          icon="group"
+          title="Native Mentors"
+          description="Real-world practice"
+          variant="secondary"
+        />
       </div>
 
       <div className="pt-4">

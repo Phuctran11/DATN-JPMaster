@@ -1,5 +1,5 @@
 import { PrimaryButton, OutlineButton } from '../Button';
-import { Badge, Stat, Container } from '../ui';
+import { Badge, Stat, Container, AvatarGroup } from '../ui';
 import { Heading, Text } from '../ui/Typography';
 
 function HeroContent() {
@@ -29,17 +29,15 @@ function HeroContent() {
         <div className="w-px h-10 bg-outline-variant"></div>
         <Stat value="98%" label="Success Rate" />
         <div className="w-px h-10 bg-outline-variant"></div>
-        <div className="flex -space-x-3">
-          <div className="w-10 h-10 rounded-full border-2 border-white bg-primary-container flex items-center justify-center text-white text-xs font-bold">
-            JP
-          </div>
-          <div className="w-10 h-10 rounded-full border-2 border-white bg-tertiary-container flex items-center justify-center text-white text-xs font-bold">
-            AM
-          </div>
-          <div className="w-10 h-10 rounded-full border-2 border-white bg-secondary-container flex items-center justify-center text-on-secondary-container text-xs font-bold">
-            KT
-          </div>
-        </div>
+        <AvatarGroup
+          avatars={[
+            { initials: 'JP', color: '#FFB703' },
+            { initials: 'AM', color: '#8ECAE6' },
+            { initials: 'KT', color: '#FB5607' }
+          ]}
+          maxShow={3}
+          size="sm"
+        />
       </div>
     </div>
   );
