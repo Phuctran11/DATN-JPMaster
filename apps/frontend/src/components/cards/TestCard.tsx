@@ -1,4 +1,4 @@
-import { Card } from '../ui';
+import { Card, ImageCard, LevelBadge } from '../ui';
 import { Heading } from '../ui/Typography';
 
 interface TestCardProps {
@@ -14,7 +14,6 @@ interface TestCardProps {
 export function TestCard({
   title,
   level,
-  levelColor = 'bg-primary',
   type,
   duration,
   image,
@@ -22,11 +21,9 @@ export function TestCard({
 }: TestCardProps) {
   return (
     <Card className="bg-surface border border-outline-variant hover:shadow-lg transition-all duration-300 flex flex-col group">
-      <div className="p-stack-lg flex-grow">
+      <div className="p-stack-lg flex-grow flex flex-col">
         <div className="flex justify-between items-start mb-stack-md">
-          <span className={`px-3 py-1 ${levelColor} text-white text-[12px] font-bold rounded uppercase tracking-wider`}>
-            {level}
-          </span>
+          <LevelBadge level={level} variant="solid" />
           <span className="material-symbols-outlined text-outline group-hover:text-secondary transition-colors">
             bookmark
           </span>
@@ -44,7 +41,9 @@ export function TestCard({
             {duration}
           </span>
         </div>
-        <img className="w-full h-40 object-cover rounded mb-stack-md opacity-90 group-hover:opacity-100 transition-opacity" alt={title} src={image} />
+        <div className="group">
+          <ImageCard src={image} alt={title} rounded="md" className="h-40 mb-stack-md opacity-90 group-hover:opacity-100 transition-opacity" />
+        </div>
       </div>
       <div className="px-stack-lg pb-stack-lg">
         <button

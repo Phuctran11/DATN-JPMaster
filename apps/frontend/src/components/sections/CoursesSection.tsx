@@ -1,4 +1,4 @@
-import { Card, Container, Section } from '../ui';
+import { Card, Container, Section, SectionHeader, ImageCard } from '../ui';
 import { Heading, Text } from '../ui/Typography';
 
 interface CourseCardProps {
@@ -12,20 +12,16 @@ function CourseCard({ title, price, image, level }: CourseCardProps) {
   return (
     <Card className="group">
       <div className="p-4">
-        <div className="h-52 relative rounded-2xl overflow-hidden border-2 border-surface-container-high">
-          <img
-            alt="Frame"
-            className="absolute inset-0 w-full h-full object-cover"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuB70-ARwssAJU4XiPyDYISFLYUQWA95w3zdJcIoaLPlki0ZL_rvmDvMpOcTLoRHwbX40Oj-ugBSTK-_P0d9wdfz_q4arFf7rMH7vqfNkuY-q8pPabLzQMkn712ySLy106ozoO76LZOIZx-gcS4OWIVAUUUYnEbi55SY-y5YS1zrJ8rfX3eObLAJlxlVFZopRECMgoZ7byl3YNg1mGaQKjNI0JDPcBspokYNwxHftV7lQkGWllH1edrXxNG7TCxxvlozZR5uXrVB70l1"
-          />
-          <img
-            alt={title}
-            className="relative z-10 w-full h-full object-cover p-2 rounded-3xl mix-blend-multiply opacity-90 transition-transform duration-700 group-hover:scale-105"
+        <div className="relative rounded-2xl overflow-hidden">
+          <ImageCard
             src={image}
+            alt={title}
+            badge={{ label: level, variant: 'solid' }}
+            aspectRatio="4:3"
+            hoverScale={105}
+            rounded="2xl"
+            className="h-52"
           />
-          <span className="absolute top-4 right-4 bg-primary text-white px-3 py-1 rounded-lg text-[10px] font-bold z-20">
-            {level}
-          </span>
         </div>
       </div>
       <div className="p-8 flex flex-col h-full">
@@ -49,13 +45,14 @@ function CourseCard({ title, price, image, level }: CourseCardProps) {
 function FeaturedCourseCard() {
   return (
     <div className="group relative bg-[#00164e] rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col lg:flex-row min-h-[450px] border-4 border-white mb-8">
-      <div className="lg:w-1/2 relative">
-        <img
-          alt="Keigo course"
-          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+      <div className="lg:w-1/2 relative group/img">
+        <ImageCard
           src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxxn-xxWIAu4Q8fJ-91hv1WzJoztTIvidUUce3Z-xmJN6GEngC-j-uoX9lF7qWXH7dqyAGXIn86yIOZgSJx6p6sj0h9khJfQtpYb2yR0HU1UVasuc5k8ZfObntEUApa-oDaVy0KWyefc4UIDcAvAIsDU9tRCX0B-XbFGtRmUBQSN9cwCNJ7ix-oLYlk7WwZEhZSQ1f0KxGf77NH3itdMLXJxK1RG3XUcE6Lcqw_SNY3RblWKorAFEU0Lr7aIJYrJsPifREtEL_TQR1"
+          alt="Keigo course"
+          overlay={{ color: 'absolute inset-0 bg-gradient-to-r from-[#00164e]/40 to-transparent' }}
+          hoverScale={105}
+          className="w-full h-full"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#00164e]/40 to-transparent"></div>
       </div>
       <div className="lg:w-1/2 p-12 flex flex-col justify-center space-y-6">
         <div>
@@ -86,30 +83,6 @@ function FeaturedCourseCard() {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function CoursesHeader() {
-  return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
-      <div className="max-w-xl">
-        <span className="text-secondary font-bold tracking-[0.2em] uppercase text-xs mb-2 block">
-          — Featured Programs
-        </span>
-        <Heading level="h2" size="headline-lg" className="mb-4">
-          Master Your Structured Path
-        </Heading>
-        <Text variant="body-md" color="on-surface-variant">
-          Break the traditional learning barrier with courses that blend culture, ethics, and language proficiency.
-        </Text>
-      </div>
-      <a href="#" className="group inline-flex items-center gap-2 bg-white px-6 py-3 rounded-full border border-outline-variant hover:border-primary text-primary font-bold transition-all shadow-sm">
-        View All Courses
-        <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">
-          arrow_forward
-        </span>
-      </a>
     </div>
   );
 }
@@ -150,7 +123,13 @@ export function FeaturedCoursesSection() {
         }}
       ></div>
       <Container className="relative z-10">
-        <CoursesHeader />
+        <SectionHeader
+          badge="Featured Programs"
+          title="Master Your Structured Path"
+          description="Break the traditional learning barrier with courses that blend culture, ethics, and language proficiency."
+          cta={{ label: 'View All Courses', href: '#' }}
+          className="mb-12"
+        />
         <FeaturedCourseCard />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {courses.map((course) => (

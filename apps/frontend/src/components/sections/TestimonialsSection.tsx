@@ -1,5 +1,5 @@
-import { Avatar, Container, Section } from '../ui';
-import { Heading, Text } from '../ui/Typography';
+import { Avatar, Container, Section, SectionHeader, StarRating } from '../ui';
+import { Text } from '../ui/Typography';
 
 interface TestimonialProps {
   quote: string;
@@ -47,26 +47,7 @@ function LargeTestimonial() {
           "The structure of the Keigo course is unlike anything else online. It's actually designed for serious professionals who want to work in Japan, not just tourists looking for phrases."
         </p>
       </div>
-      <div className="flex gap-1 text-secondary mt-8">
-        {[...Array(5)].map((_, i) => (
-          <span key={i} className="material-symbols-outlined fill-1">
-            star
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TestimonialsHeader() {
-  return (
-    <div className="text-center max-w-2xl mx-auto mb-20 space-y-4">
-      <span className="text-secondary font-bold tracking-[0.2em] uppercase text-xs">
-        Community Voices
-      </span>
-      <Heading level="h2" size="headline-lg">
-        Scholars Around the World
-      </Heading>
+      <StarRating rating={5} size="lg" className="mt-8" />
     </div>
   );
 }
@@ -93,7 +74,11 @@ export function TestimonialsSection() {
   return (
     <Section bgColor="light">
       <Container>
-        <TestimonialsHeader />
+        <SectionHeader
+          badge="Community Voices"
+          title="Scholars Around the World"
+          className="mb-12"
+        />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-fr">
           <LargeTestimonial />
           {smallTestimonials.map((testimonial) => (

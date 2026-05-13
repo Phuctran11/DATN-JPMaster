@@ -1,4 +1,17 @@
 import React from 'react';
+export { LevelBadge } from './LevelBadge';
+export { StatusBadge } from './StatusBadge';
+export { CategoryBadge } from './CategoryBadge';
+export { ProgressBar } from './ProgressBar';
+export { ImageCard } from './ImageCard';
+export { AvatarGroup } from './AvatarGroup';
+export { SectionHeader } from './SectionHeader';
+export { FeatureItem } from './FeatureItem';
+export { StarRating } from './StarRating';
+export { FloatingCard } from './FloatingCard';
+export { IconButton } from './IconButton';
+export { SocialLinks } from './SocialLinks';
+export { FooterLinkColumn } from './FooterLinkColumn';
 
 interface CardProps {
   className?: string;
