@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Header, Footer, Button, Card, Container, Section, Icon } from '../components';
+import { Header, Footer, Button, Card, Container, Section, Icon, Breadcrumbs } from '../components';
 import { Heading, Text } from '../components/ui/Typography';
 
 interface CollectionCardProps {
@@ -74,6 +74,11 @@ function FlashcardItem({ kanji, romaji, meaning, example }: FlashcardItemProps) 
 }
 
 export default function Flashcard() {
+  const breadcrumbs = [
+    { label: 'Home', path: '/' },
+    { label: 'Flashcards' },
+  ];
+
   const [collectionTitle, setCollectionTitle] = useState('');
 
   const collections = [
@@ -91,6 +96,7 @@ export default function Flashcard() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
+      <Breadcrumbs items={breadcrumbs} />
       <main className="flex-1">
         <Section bgColor="light">
           <Container>

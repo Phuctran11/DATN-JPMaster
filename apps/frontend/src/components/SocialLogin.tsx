@@ -1,9 +1,14 @@
 import { FaGoogle } from 'react-icons/fa';
-import { googleAuthService } from '../services/googleAuth';
 import { authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
+
+declare global {
+  interface Window {
+    google: any;
+  }
+}
 
 interface SocialLoginProps {
   loading: boolean;
@@ -18,18 +23,16 @@ export function SocialLogin({ loading, setLoading }: SocialLoginProps) {
   const handleGoogleLogin = async () => {
     try {
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      console.log('🔍 DEBUG - Client ID:', clientId);
-      console.log('🔍 DEBUG - Origin:', window.location.origin);
       
       if (!clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
-        addToast('⚠️ Google Client ID not configured. Check .env or .env.local file (VITE_GOOGLE_CLIENT_ID)', 'error');
+        addToast('Google Client ID not configured. Check .env or .env.local file (VITE_GOOGLE_CLIENT_ID)', 'error');
         console.error('Missing VITE_GOOGLE_CLIENT_ID in .env/.env.local. Current value:', clientId);
         return;
       }
 
       // Check if Google Sign-In script is loaded
       if (!window.google) {
-        addToast('⚠️ Google Sign-In library not loaded. Please ensure script is in HTML head tag', 'error');
+        addToast('Google Sign-In library not loaded. Please ensure script is in HTML head tag', 'error');
         console.error('window.google is undefined. Google script may not have loaded.');
         return;
       }
@@ -44,7 +47,7 @@ export function SocialLogin({ loading, setLoading }: SocialLoginProps) {
             if (response.credential) {
               try {
                 const res = await authAPI.googleLogin({ token: response.credential });
-                login(res.data);
+                login(res.data, res.token);
                 addToast('Google login successful!', 'success');
                 navigate('/');
               } catch (err) {
@@ -54,52 +57,37 @@ export function SocialLogin({ loading, setLoading }: SocialLoginProps) {
                 setLoading(false);
               }
             } else {
-              addToast('❌ No credential received from Google', 'error');
+              addToast('No credential received from Google', 'error');
               setLoading(false);
             }
           },
           error_callback: () => {
-            addToast('❌ Google Sign-In error. Check console and Google Cloud Console origin settings', 'error');
+            addToast('Google Sign-In error. Check console and Google Cloud Console origin settings', 'error');
             console.error('Google initialization callback error');
             setLoading(false);
           },
         });
 
-        // Render the button with fixed pixel width
-        const googleBtn = document.getElementById('google-login-btn');
-        if (googleBtn) {
-          window.google.accounts.id.renderButton(googleBtn, {
-            theme: 'outline',
-            size: 'large',
-            width: '320', // Fixed pixel width instead of percentage
-          });
-
-          // Click the button
-          setTimeout(() => {
-            const button = googleBtn.querySelector('button');
-            if (button) {
-              button.click();
-            } else {
-              throw new Error('Google button element not found after render');
-            }
-          }, 100);
-        } else {
-          throw new Error('Google button container (id="google-login-btn") not found in DOM');
-        }
+        // Trigger Google One Tap / account chooser instead of clicking a hidden DOM button.
+        window.google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
+            setLoading(false);
+          }
+        });
       } catch (initError) {
         const message = initError instanceof Error ? initError.message : 'Unknown error';
         console.error('Google initialization error:', initError);
         
         if (message.includes('origin')) {
-          addToast('❌ IMPORTANT: Origin not allowed!\n\n1. Go to Google Cloud Console\n2. Find YOUR CORRECT OAuth Client ID (check the Client ID value)\n3. Edit it\n4. Make SURE you add http://localhost:5173 to "Authorized JavaScript origins"\n5. Wait 60 seconds\n6. Refresh this page', 'error');
+          addToast('IMPORTANT: Origin not allowed!\n\n1. Go to Google Cloud Console\n2. Find YOUR CORRECT OAuth Client ID (check the Client ID value)\n3. Edit it\n4. Make SURE you add http://localhost:5173 to "Authorized JavaScript origins"\n5. Wait 60 seconds\n6. Refresh this page', 'error');
         } else {
-          addToast(`❌ ${message}`, 'error');
+          addToast(`${message}`, 'error');
         }
         setLoading(false);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Google login error';
-      addToast(`❌ ${errorMsg}`, 'error');
+      addToast(`${errorMsg}`, 'error');
       console.error('Google login handler error:', err);
       setLoading(false);
     }
@@ -128,7 +116,6 @@ export function SocialLogin({ loading, setLoading }: SocialLoginProps) {
           <FaGoogle className="w-5 h-5" />
           <span className="font-label-md text-label-md text-on-surface">Google</span>
         </button>
-        <div id="google-login-btn" className="hidden" />
       </div>
     </>
   );

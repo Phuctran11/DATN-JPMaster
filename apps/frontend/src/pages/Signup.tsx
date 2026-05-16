@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Input, Button, GlassCard, Icon, PasswordInput } from '../components';
+import { Input, Button, GlassCard, Icon, PasswordInput, Breadcrumbs, Header, Footer } from '../components';
 import { Heading, Text } from '../components/ui/Typography';
 import { authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -169,34 +169,44 @@ function SignupBentoCards() {
 }
 
 export default function Signup() {
+  const breadcrumbs = [
+    { label: 'Home', path: '/' },
+    { label: 'Sign Up' },
+  ];
+
   return (
-    <main
-      className="relative min-h-screen pt-24 pb-section-gap flex items-center justify-center bg-background"
-      style={{
-        backgroundColor: '#faf8ff',
-        backgroundImage:
-          'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2780%27 height=%2740%27 viewBox=%270 0 80 40%27%3E%3Cpath d=%27M0 40c4.5 0 9-2 12-5s7.5-3 12-3 9 2 12 5 7.5 3 12 3 9-2 12-5 7.5-3 12-3 9 2 12 5M0 20c4.5 0 9-2 12-5s7.5-3 12-3 9 2 12 5 7.5 3 12 3 9-2 12-5 7.5-3 12-3 9 2 12 5%27 fill=%27none%27 stroke=%27%23e5e7eb%27 stroke-width=%271%27/%3E%3C/svg%3E")',
-      }}
-    >
-      {/* Decorative Elements */}
-      <SignupDecorations />
+    <div className="flex flex-col min-h-screen bg-background">
+      <Header />
+      <Breadcrumbs items={breadcrumbs} />
+      <main
+        className="relative flex-grow py-24 pb-section-gap flex items-center justify-center bg-background"
+        style={{
+          backgroundColor: '#faf8ff',
+          backgroundImage:
+            'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2780%27 height=%2740%27 viewBox=%270 0 80 40%27%3E%3Cpath d=%27M0 40c4.5 0 9-2 12-5s7.5-3 12-3 9 2 12 5 7.5 3 12 3 9-2 12-5 7.5-3 12-3 9 2 12 5M0 20c4.5 0 9-2 12-5s7.5-3 12-3 9 2 12 5 7.5 3 12 3 9-2 12-5 7.5-3 12-3 9 2 12 5%27 fill=%27none%27 stroke=%27%23e5e7eb%27 stroke-width=%271%27/%3E%3C/svg%3E")',
+        }}
+      >
+        {/* Decorative Elements */}
+        <SignupDecorations />
 
-      {/* Registration Container */}
-      <div className="w-full flex justify-center relative z-10">
-        <GlassCard className="w-full mx-margin-mobile md:mx-margin-desktop max-w-[520px] p-stack-lg md:p-12 rounded-xl shadow-lg">
-          <div className="mb-stack-lg">
-            <Heading level="h1" size="headline-lg" className="mb-2">
-              Master the Art of Japanese
-            </Heading>
-            <Text variant="body-md" color="on-surface-variant">
-              Begin your scholarly journey with elite curriculum and focused study tools.
-            </Text>
-          </div>
+        {/* Registration Container */}
+        <div className="w-full flex justify-center relative z-10">
+          <GlassCard className="w-full mx-margin-mobile md:mx-margin-desktop max-w-[520px] p-stack-lg md:p-12 rounded-xl shadow-lg">
+            <div className="mb-stack-lg">
+              <Heading level="h1" size="headline-lg" className="mb-2">
+                Master the Art of Japanese
+              </Heading>
+              <Text variant="body-md" color="on-surface-variant">
+                Begin your scholarly journey with elite curriculum and focused study tools.
+              </Text>
+            </div>
 
-          <SignupForm />
-          <SignupBentoCards />
-        </GlassCard>
-      </div>
-    </main>
+            <SignupForm />
+            <SignupBentoCards />
+          </GlassCard>
+        </div>
+      </main>
+      <Footer />
+    </div>
   );
 }

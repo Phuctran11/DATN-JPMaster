@@ -35,9 +35,40 @@ export class CourseController {
     try {
       const limit = Math.min(Number(req.query.limit) || 10, 100);
       const offset = Number(req.query.offset) || 0;
+      const withLessons = req.query.withLessons === 'true';
 
-      const courses = await courseModel.getAllCourses(limit, offset);
+      let courses;
+      if (withLessons) {
+        // Get courses with lessons
+        const allCourses = await courseModel.getAllCourses(limit, offset);
+        courses = [];
+        for (const course of allCourses) {
+          const courseWithLessons = await courseModel.getCourseByIdWithLessons(course.course_id);
+          if (courseWithLessons) {
+            courses.push(courseWithLessons);
+          }
+        }
+      } else {
+        courses = await courseModel.getAllCourses(limit, offset);
+        // Add is_free flag to each course
+        courses = courses.map(course => ({
+          ...course,
+          is_free: course.price === 0,
+        }));
+      }
+
       return res.status(200).json({ data: courses, count: courses.length });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPopularCourses(req: Request, res: Response, next: NextFunction) {
+    try {
+      const limit = Math.min(Number(req.query.limit) || 4, 20);
+      const courses = await courseModel.getPopularCourses(limit);
+      const withFreeFlag = courses.map(course => ({ ...course, is_free: course.price === 0 }));
+      return res.status(200).json({ data: withFreeFlag, count: withFreeFlag.length });
     } catch (error) {
       next(error);
     }
@@ -51,7 +82,8 @@ export class CourseController {
         return res.status(400).json({ error: "Invalid course ID" });
       }
 
-      const course = await courseModel.getCourseById(Number(id));
+      // Always fetch with lessons and ratings for detail view
+      const course = await courseModel.getCourseByIdWithDetail(Number(id));
 
       if (!course) {
         return res.status(404).json({ error: "Course not found" });

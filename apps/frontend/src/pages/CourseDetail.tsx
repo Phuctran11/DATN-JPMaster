@@ -1,5 +1,14 @@
-import { Header, Footer, Button, Card, Container } from '../components';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Header, Footer, Button, Card, Container, Breadcrumbs } from '../components';
+import { ImageCard } from '../components/ui';
 import { Heading, Text } from '../components/ui/Typography';
+import { courseAPI, enrollmentAPI, ratingAPI, type Course, type Lesson } from '../services/api';
+import { RatingForm } from '../components/cards/RatingForm';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import courseImage from '../assets/course.png';
+import { getCourseLessonCount } from '../utils/course';
 
 interface CourseModule {
   id: number;
@@ -8,18 +17,62 @@ interface CourseModule {
   duration: string;
 }
 
-function ModuleItem({ module }: { module: CourseModule }) {
+function ModuleItem({
+  module,
+  lesson,
+  onPlay,
+  canPlay,
+}: {
+  module: CourseModule;
+  lesson?: Lesson;
+  onPlay?: () => void;
+  canPlay: boolean;
+}) {
+  const isCompleted = Boolean(lesson?.is_completed);
+  const isLocked = !isCompleted && !canPlay;
+
   return (
-    <div className="group bg-white p-stack-lg border border-outline-variant hover:border-primary transition-colors flex justify-between items-center">
+    <div
+      className={`group p-stack-lg border transition-all flex justify-between items-center shadow-sm ${
+        isCompleted
+          ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-200 hover:border-emerald-400 hover:bg-emerald-100'
+          : isLocked
+            ? 'bg-surface-container-low border-outline-variant opacity-80'
+          : 'bg-white border-outline-variant hover:border-primary'
+      }`}
+    >
       <div className="flex gap-stack-lg">
-        <span className="font-headline-md text-outline-variant group-hover:text-primary transition-colors">{String(module.id).padStart(2, '0')}</span>
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-full border text-headline-sm font-bold transition-colors ${
+            isCompleted
+              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-200'
+              : isLocked
+                ? 'bg-surface-container text-on-surface-variant border-outline-variant'
+              : 'bg-surface text-outline-variant border-outline-variant group-hover:border-primary group-hover:text-primary'
+          }`}
+        >
+          {String(module.id).padStart(2, '0')}
+        </div>
+        <span
+          className={`hidden font-headline-md transition-colors ${
+            isCompleted ? 'text-emerald-700 group-hover:text-emerald-800' : 'text-outline-variant group-hover:text-primary'
+          }`}
+        >
+          {String(module.id).padStart(2, '0')}
+        </span>
         <div>
-          <h3 className="font-headline-sm text-on-surface mb-1">{module.title}</h3>
-          <div className="flex items-center gap-4 text-label-md text-on-surface-variant">
-            <span className="flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">play_circle</span>
-              {module.videos} Videos
-            </span>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className={`font-headline-sm ${isCompleted ? 'text-emerald-900' : 'text-on-surface'}`}>{module.title}</h3>
+          </div>
+          <div className={`flex items-center gap-4 text-label-md ${isCompleted ? 'text-emerald-700' : 'text-on-surface-variant'}`}>
+            {lesson && (
+              <>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">{lesson.content_type === 'video' ? 'play_circle' : 'description'}</span>
+                  {lesson.content_type}
+                </span>
+              </>
+            )}
             <span className="flex items-center gap-1">
               <span className="material-symbols-outlined text-[16px]">timer</span>
               {module.duration} Hours
@@ -27,42 +80,71 @@ function ModuleItem({ module }: { module: CourseModule }) {
           </div>
         </div>
       </div>
-      <button className="bg-surface-container hover:bg-primary-container hover:text-white px-4 py-2 font-label-md transition-all">
-        View Details
-      </button>
+      {canPlay ? (
+        <button
+          type="button"
+          onClick={onPlay}
+          className={`px-4 py-2 font-label-md transition-all flex items-center gap-2 ${
+            isCompleted
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-200'
+              : 'bg-surface-container hover:bg-primary-container hover:text-white'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">play_circle</span>
+        </button>
+      ) : (
+        <div className="px-4 py-2 font-label-md flex items-center gap-2 text-on-surface-variant">
+          <span className="material-symbols-outlined text-[18px]">lock</span>
+        </div>
+      )}
     </div>
   );
 }
 
 interface ReviewCard {
-  author: string;
-  role: string;
-  review: string;
-  initials: string;
-  bgColor: string;
+  rating_id: number;
+  user_id: number;
+  username?: string;
+  review: string | null;
+  rating: number;
+  created_at: string;
 }
 
-function ReviewItem({ review }: { review: ReviewCard }) {
+function ReviewItem({ review, isUser }: { review: ReviewCard; isUser?: boolean }) {
+  const getInitials = (username: string | undefined) => (username || 'U').substring(0, 2).toUpperCase();
+  const colors = ['bg-primary-fixed', 'bg-secondary-fixed', 'bg-tertiary-fixed'];
+  
   return (
-    <Card className="bg-white p-8 border border-outline-variant relative">
+    <Card className={`h-full relative p-6 border transition-all ${isUser ? 'bg-primary-fixed/20 border-primary shadow-lg shadow-primary/15 ring-2 ring-primary/25' : 'bg-white border-outline-variant'}`}>
       <div className="absolute -top-4 -left-4 text-primary opacity-10">
         <span className="material-symbols-outlined text-6xl">format_quote</span>
       </div>
-      <div className="flex text-secondary mb-4">
-        {[...Array(5)].map((_, i) => (
-          <span key={i} className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-            star
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex text-secondary">
+          {[...Array(5)].map((_, i) => (
+            <span 
+              key={i} 
+              className="material-symbols-outlined text-[18px]"
+              style={{ fontVariationSettings: i < review.rating ? "'FILL' 1" : "'FILL' 0" }}
+            >
+              star
+            </span>
+          ))}
+        </div>
+        {isUser && (
+          <span className="bg-primary text-on-primary px-3 py-1 rounded-full text-label-sm font-bold">
+            Your Review
           </span>
-        ))}
+        )}
       </div>
-      <p className="text-on-surface italic font-body-md mb-6 leading-relaxed">"{review.review}"</p>
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${review.bgColor} rounded-full flex items-center justify-center font-bold`}>
-          {review.initials}
+      <p className="text-on-surface italic font-body-md mb-6 leading-relaxed min-h-[84px]">"{review.review || 'No review text provided'}"</p>
+      <div className="flex items-center gap-3 mt-auto">
+        <div className={`w-10 h-10 ${colors[review.user_id % colors.length]} rounded-full flex items-center justify-center font-bold text-xs`}>
+          {getInitials(review.username)}
         </div>
         <div>
-          <p className="text-label-md font-bold">{review.author}</p>
-          <p className="text-[12px] text-on-surface-variant">{review.role}</p>
+          <p className="text-label-md font-bold">{review.username || 'Anonymous'}</p>
+          <p className="text-[12px] text-on-surface-variant">{new Date(review.created_at).toLocaleDateString()}</p>
         </div>
       </div>
     </Card>
@@ -70,40 +152,173 @@ function ReviewItem({ review }: { review: ReviewCard }) {
 }
 
 export default function CourseDetail() {
-  const modules: CourseModule[] = [
-    { id: 1, title: 'Introduction to Radical Families', videos: 12, duration: '8.5' },
-    { id: 2, title: 'Complex Stroke Order Mastery', videos: 18, duration: '15' },
-    { id: 3, title: 'Contextual N1 Compounds', videos: 22, duration: '21.5' },
+  const { id: courseId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  const showToast = useCallback(
+    (message: string, type: 'success' | 'error' | 'info' | 'warning') => addToast(message, type),
+    [addToast]
+  );
+  
+  const [course, setCourse] = useState<Course | null>(null);
+  const [reviews, setReviews] = useState<ReviewCard[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollmentStatus, setEnrollmentStatus] = useState<'active' | 'completed' | 'dropped' | null>(null);
+  const [userRating, setUserRating] = useState<ReviewCard | null>(null);
+
+  const fetchReviews = useCallback(async () => {
+    if (!courseId) return;
+    try {
+      const reviewsResult = await ratingAPI.getCourseRatings(parseInt(courseId), 10, 0);
+      setReviews(reviewsResult.data);
+      setAverageRating(reviewsResult.average_rating);
+      
+      // Find user's rating if they have one
+      if (user) {
+        const userReview = reviewsResult.data.find(r => r.user_id === user.user_id);
+        setUserRating(userReview || null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch reviews:', error);
+    }
+  }, [courseId, user]);
+
+  const orderedReviews = (() => {
+    const source = userRating ? [userRating, ...reviews] : reviews;
+    const uniqueReviews = Array.from(new Map(source.map((review) => [review.rating_id, review])).values());
+
+    return uniqueReviews.sort((a, b) => {
+      const aIsUserReview = Boolean(user && a.user_id === user.user_id);
+      const bIsUserReview = Boolean(user && b.user_id === user.user_id);
+
+      if (aIsUserReview !== bIsUserReview) {
+        return aIsUserReview ? -1 : 1;
+      }
+
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  })();
+
+  useEffect(() => {
+    if (!courseId) return;
+
+    const fetchCourse = async () => {
+      try {
+        setLoading(true);
+        const result = await courseAPI.getCourseById(parseInt(courseId));
+        setCourse(result.data);
+        
+        // Fetch reviews
+        await fetchReviews();
+
+        // Check if user is enrolled in this course
+        if (user) {
+          try {
+            const enrollmentResult = await enrollmentAPI.getEnrolledCourseDetail(parseInt(courseId));
+            setCourse(enrollmentResult.data);
+            setEnrollmentStatus(enrollmentResult.data.enrollment_status as 'active' | 'completed' | 'dropped');
+          } catch (error) {
+            // User is not enrolled (404 or error)
+            setEnrollmentStatus(null);
+          }
+        }
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Failed to load course', 'error');
+        navigate('/courses');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourse();
+  }, [courseId, navigate, showToast, user, fetchReviews]);
+
+  const firstUnfinishedLessonIndex = course?.lessons?.findIndex((lesson) => !lesson.is_completed) ?? -1;
+
+  const handleEnroll = async () => {
+    if (!user) {
+      showToast('Please log in to enroll', 'error');
+      navigate('/login');
+      return;
+    }
+
+    if (!courseId || !course) return;
+
+    try {
+      setEnrolling(true);
+      await enrollmentAPI.enrollCourse(parseInt(courseId));
+      showToast('Successfully enrolled in course!', 'success');
+      navigate('/courses');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to enroll', 'error');
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  const handleGetStarted = async () => {
+    if (!courseId) return;
+
+    try {
+      setEnrolling(true);
+      const lessonResult = await enrollmentAPI.getNextLesson(parseInt(courseId));
+      navigate(`/courses/${courseId}/lessons/${lessonResult.data.lesson_id}`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to load lesson', 'error');
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-on-surface-variant">Loading course details...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-on-surface-variant">Course not found</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  const origin = (location.state as any)?.from;
+  const breadcrumbs = [
+    { label: 'Home', path: '/' },
+    {
+      label: origin === '/courses' ? 'My Learning' : origin === '/explore' ? 'Explore Courses' : (enrollmentStatus === 'active' ? 'My Learning' : 'Explore Courses'),
+      path: origin === '/courses' ? '/courses' : origin === '/explore' ? '/explore' : (enrollmentStatus === 'active' ? '/courses' : '/explore'),
+    },
+    { label: course.title },
   ];
 
-  const reviews: ReviewCard[] = [
-    {
-      author: 'Aiko K.',
-      role: 'Graduated N1 2023',
-      review: "Incredible depth! I've used many apps before, but the academic rigor here is unmatched. Dr. Tanaka's explanations of radicals transformed my memorization process.",
-      initials: 'AK',
-      bgColor: 'bg-primary-fixed',
-    },
-    {
-      author: 'Marcus S.',
-      role: 'Language Researcher',
-      review:
-        "The focus on stroke order and calligraphy flow made my writing look professional. It's not just about passing a test; it's about cultural mastery.",
-      initials: 'MS',
-      bgColor: 'bg-tertiary-fixed',
-    },
-    {
-      author: 'Elena L.',
-      role: 'Foreign Correspondent',
-      review: 'JPMaster bridges the gap between learning and living the language. The legal compound module was exactly what I needed for my work in Tokyo.',
-      initials: 'EL',
-      bgColor: 'bg-secondary-fixed',
-    },
-  ];
+  const modules: CourseModule[] = (course.lessons || []).map((lesson, index) => ({
+    id: index + 1,
+    title: lesson.title,
+    videos: 1,
+    duration: '2.5',
+  }));
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
+      <Breadcrumbs items={breadcrumbs} />
       <main className="flex-1">
         {/* Hero Section */}
         <header className="relative overflow-hidden pt-20 pb-32 bg-gradient-to-br from-primary-fixed to-primary/10">
@@ -119,33 +334,21 @@ export default function CourseDetail() {
               <div className="md:col-span-7 flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-stack-md">
                   <span className="bg-primary-container text-white px-3 py-1 rounded-full text-[12px] font-bold tracking-widest uppercase">
-                    JLPT N1 Level
+                    {course.is_free ? 'FREE COURSE' : 'PREMIUM COURSE'}
                   </span>
-                  <span className="text-primary font-semibold text-label-md">• Premium Academic Track</span>
+                  <span className="text-primary font-semibold text-label-md">• Quality Learning</span>
                 </div>
                 <h1 className="font-display-lg text-display-lg text-primary mb-stack-md leading-tight">
-                  Mastering Advanced Kanji: The Path to N1 Literacy
+                  {course.title}
                 </h1>
                 <Text variant="body-lg" color="on-surface-variant" className="mb-stack-lg max-w-xl">
-                  A rigorous academic exploration of high-level Japanese calligraphy, complex radicals, and the nuanced contextual usage
-                  required for absolute fluency.
+                  {course.description || 'Explore this comprehensive course with structured lessons and interactive content.'}
                 </Text>
                 <div className="flex flex-wrap items-center gap-stack-lg mb-stack-lg">
-                  <div className="flex items-center gap-2">
-                    <img
-                      alt="Dr. Hiroshi Tanaka"
-                      className="w-12 h-12 rounded-full object-cover border-2 border-primary"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqAeJ-I82MtlSEYzmUpqaLBCTC0mlpHa1nzC_JKZtw3xElGy9-23faHqhhiwhxGPNMHJcxLX-a7WFrKIiJoIOsJqoUq46BNcpbO70HGOaLSX4r1szXBWZMuzF2RLcYbTKbFKbLWUC93cw2Z083RR_4Oo8ZiOa_WeA7eGrinPyeTxA8sM7mAjYKS9Ul79I9w3WbzSY9MTxXVkmkD21POBLdL4COYkOEDlgpgKdCiXatOpcXhJ0GQqTVsKiebpUZ9swp7Wjuwn8W0EV6"
-                    />
-                    <div>
-                      <p className="text-label-md font-bold text-on-surface">Dr. Hiroshi Tanaka</p>
-                      <p className="text-[12px] text-on-surface-variant">Lead Instructor, Kyoto Linguistics</p>
-                    </div>
-                  </div>
                   <div className="h-10 w-px bg-outline-variant"></div>
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary">schedule</span>
-                    <span className="text-body-md font-semibold">45 hours study time</span>
+                    <span className="text-body-md font-semibold">{getCourseLessonCount(course)} Lessons</span>
                   </div>
                   <div className="h-10 w-px bg-outline-variant"></div>
                   <div className="flex items-center gap-2">
@@ -154,19 +357,47 @@ export default function CourseDetail() {
                   </div>
                 </div>
                 <div className="flex items-center gap-stack-md">
-                  <Button className="px-8 py-4">Enroll Now</Button>
-                  <div className="flex flex-col">
-                    <span className="text-label-md text-on-surface-variant line-through">$299.00</span>
-                    <span className="text-headline-md font-bold text-primary">$199.00</span>
-                  </div>
+                  {enrollmentStatus === null ? (
+                    <>
+                      <Button onClick={handleEnroll} disabled={enrolling}>
+                        {enrolling ? 'Enrolling...' : 'Enroll Now'}
+                      </Button>
+                      <div className="flex flex-col">
+                        {!course.is_free && (
+                          <span className="text-label-md text-on-surface-variant line-through">
+                            ${(course.price * 1.5).toFixed(2)}
+                          </span>
+                        )}
+                        <span className="text-headline-md font-bold text-primary">
+                          {course.is_free ? 'FREE' : `$${course.price.toFixed(2)}`}
+                        </span>
+                      </div>
+                    </>
+                  ) : enrollmentStatus === 'active' ? (
+                    <Button onClick={handleGetStarted} variant="primary">
+                      Get Started
+                    </Button>
+                  ) : enrollmentStatus === 'completed' ? (
+                    <Button variant="secondary" disabled>
+                      ✓ Completed
+                    </Button>
+                  ) : (
+                    <Button variant="secondary" disabled>
+                      Dropped
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="md:col-span-5 hidden md:block">
-                <Card className="p-4 rotate-2 hover:rotate-0 transition-transform duration-500">
-                  <img
-                    alt="Japanese Calligraphy"
-                    className="rounded-lg w-full aspect-[4/5] object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJY0AbvRaC0k7nbkawUYxNr8RNWg-kX-VrJlyThC5DYEA46C8d_HwkCYydMVb0ZrL8Q0dv84-TPj9WZw5XGccGMdijSIUzxirMwB8YKXqu7LWePfmbWU0YTzss3JP7vDyh0oR384FhfxGNhn2oCjziCi9QNhU_Fig1XnPFxOSmDdHh545DrJZgcTIzLtm-5rn7A6lhgA5c2_eQg-1-ri4w8fIm7kSSn9f-37dJPiHo9h1vFaxC6p-a4kT8MWWCeKwhoZrs_t5DCVuD"
+                <Card className="rotate-2 hover:rotate-0 transition-transform duration-500 overflow-hidden group">
+                  <ImageCard
+                    src={courseImage}
+                    alt={course.title}
+                    overlay={{ gradient: true }}
+                    aspectRatio="4:3"
+                    hoverScale={110}
+                    rounded="lg"
+                    className="w-full shadow-2xl"
                   />
                 </Card>
               </div>
@@ -184,40 +415,87 @@ export default function CourseDetail() {
                     Course Content
                   </Heading>
                   <Text variant="body-md" color="on-surface-variant" className="mb-stack-lg leading-relaxed">
-                    This curriculum is designed for students who have surpassed intermediate levels and are preparing for the JLPT N1 or
-                    academic research. We focus on mastering complex radicals and contextual usage.
+                    This course contains {getCourseLessonCount(course)} lessons designed to help you master the material progressively.
                   </Text>
                   <Card className="p-6 bg-secondary-fixed/20 border border-secondary-fixed-dim">
-                    <h4 className="font-bold text-on-surface mb-2">What you'll master:</h4>
+                    <h4 className="font-bold text-on-surface mb-2">What's Included:</h4>
                     <ul className="space-y-2 text-on-surface-variant font-label-md">
                       <li className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
-                        800+ N1 Level Kanji
+                        {getCourseLessonCount(course)} Interactive Lessons
                       </li>
                       <li className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
-                        Radical classification systems
+                        {course.lessons?.filter(l => l.content_type === 'video').length || 0} Video Lessons
                       </li>
                       <li className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
-                        Legal and Scientific Compounds
+                        Progress Tracking
                       </li>
                       <li className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
-                        Stroke order precision
+                        Lifetime Access
                       </li>
                     </ul>
                   </Card>
                 </div>
               </div>
               <div className="md:col-span-8 space-y-stack-md">
-                {modules.map((module) => (
-                  <ModuleItem key={module.id} module={module} />
-                ))}
+                {modules.length > 0 ? (
+                  modules.map((module, idx) => (
+                    <ModuleItem
+                      key={module.id}
+                      module={module}
+                      lesson={course.lessons?.[idx]}
+                      canPlay={Boolean(course.lessons?.[idx]?.is_completed || idx === firstUnfinishedLessonIndex)}
+                      onPlay={() => {
+                        const lessonId = course.lessons?.[idx]?.lesson_id;
+                        if (!lessonId || !courseId) return;
+                        navigate(`/courses/${courseId}/lessons/${lessonId}`);
+                      }}
+                    />
+                  ))
+                ) : (
+                  <p className="text-on-surface-variant text-center py-8">No lessons yet</p>
+                )}
               </div>
             </div>
           </Container>
         </section>
+
+        {/* Rating Form Section */}
+        {enrollmentStatus && user && (
+          <section className="bg-primary-fixed/10 py-section-gap border-y border-outline-variant">
+            <Container>
+              <div className="mb-section-gap">
+                <Heading level="h2" size="headline-lg" className="text-primary">
+                  {userRating ? 'Update Your Review' : 'Share Your Experience'}
+                </Heading>
+                <Text variant="body-md" color="on-surface-variant" className="mt-2">
+                  {userRating
+                    ? 'You can update your rating and review anytime.'
+                    : 'Your feedback helps other students learn better.'}
+                </Text>
+              </div>
+              <div className="max-w-2xl">
+                <RatingForm
+                  courseId={parseInt(courseId!)}
+                  userRating={userRating}
+                  onSuccess={(newRating) => {
+                    // Update local user's rating immediately and refresh list
+                    setUserRating(newRating || null);
+                    showToast('Your review has been submitted successfully!', 'success');
+                    fetchReviews();
+                  }}
+                  onError={(error) => {
+                    showToast(error, 'error');
+                  }}
+                  disabled={loading}
+                />
+              </div>
+            </Container>
+          </section>
+        )}
 
         {/* Reviews Section */}
         <section className="bg-surface-container-low py-section-gap border-y border-outline-variant">
@@ -228,24 +506,37 @@ export default function CourseDetail() {
                   Student Reviews
                 </Heading>
                 <Text variant="body-md" color="on-surface-variant" className="mt-2">
-                  Hear from those who reached N1 literacy with us.
+                  What our students think about this course.
                 </Text>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex text-secondary">
-                  {[...Array(5)].map((_, i) => (
-                    <span key={i} className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      star
-                    </span>
-                  ))}
+                  {[...Array(5)].map((_, i) => {
+                    const starValue = i + 1;
+                    const filled = averageRating >= starValue;
+
+                    return (
+                      <span key={i} className="material-symbols-outlined" style={{ fontVariationSettings: filled ? "'FILL' 1" : "'FILL' 0" }}>
+                        star
+                      </span>
+                    );
+                  })}
                 </div>
-                <span className="font-bold text-headline-sm">4.9/5.0</span>
+                <span className="font-bold text-headline-sm">{averageRating > 0 ? `${averageRating.toFixed(1)}/5.0` : 'No rating yet'}</span>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
-              {reviews.map((review) => (
-                <ReviewItem key={review.author} review={review} />
-              ))}
+              {orderedReviews.length > 0 ? (
+                orderedReviews.map((review) => (
+                  <ReviewItem
+                    key={`${review.rating_id}`}
+                    review={review}
+                    isUser={Boolean(user && review.user_id === user.user_id)}
+                  />
+                ))
+              ) : (
+                <p className="text-on-surface-variant text-center py-8 md:col-span-3">No reviews for this course yet.</p>
+              )}
             </div>
           </Container>
         </section>
@@ -254,14 +545,28 @@ export default function CourseDetail() {
         <section className="py-section-gap text-center bg-primary text-on-primary">
           <Container>
             <Heading level="h2" size="display-lg" className="text-on-primary mb-stack-md">
-              Ready to Achieve Kanji Mastery?
+              Ready to Start Learning?
             </Heading>
             <Text variant="body-lg" color="white" className="mb-stack-lg opacity-90">
-              Join 5,000+ advanced students in the most comprehensive N1 program available online.
+              {enrollmentStatus === null
+                ? `Join thousands of students in learning ${course.title}. Enroll now and start your journey.`
+                : enrollmentStatus === 'active'
+                ? `Continue your learning journey in ${course.title}.`
+                : `You have completed ${course.title}. Great job!`}
             </Text>
-            <Button variant="secondary" className="px-12 py-5">
-              Enroll in Course Today
-            </Button>
+            {enrollmentStatus === null ? (
+              <Button variant="secondary" className="px-12 py-5" onClick={handleEnroll} disabled={enrolling}>
+                {enrolling ? 'Enrolling...' : 'Enroll in Course Today'}
+              </Button>
+            ) : enrollmentStatus === 'active' ? (
+              <Button variant="secondary" className="px-12 py-5" onClick={handleGetStarted}>
+                Get Started Learning
+              </Button>
+            ) : (
+              <Button variant="secondary" className="px-12 py-5" disabled>
+                ✓ Course Completed
+              </Button>
+            )}
           </Container>
         </section>
       </main>

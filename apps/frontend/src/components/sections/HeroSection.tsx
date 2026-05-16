@@ -1,8 +1,10 @@
+import { useNavigate } from 'react-router-dom';
 import { PrimaryButton, OutlineButton } from '../Button';
 import { Badge, Stat, Container, AvatarGroup } from '../ui';
 import { Heading, Text } from '../ui/Typography';
 
 function HeroContent() {
+  const navigate = useNavigate();
   return (
     <div className="relative z-10 space-y-stack-lg animate-fade-in-up">
       <Badge variant="primary">Academic Excellence</Badge>
@@ -16,7 +18,7 @@ function HeroContent() {
         Elevate your language proficiency through a structured, university-grade curriculum designed by expert linguists for serious learners.
       </Text>
       <div className="flex flex-wrap gap-stack-md pt-4">
-        <PrimaryButton>Explore Now</PrimaryButton>
+        <PrimaryButton onClick={() => navigate('/explore')}>Explore Now</PrimaryButton>
         <OutlineButton className="group flex items-center gap-3">
           View Syllabus
           <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">

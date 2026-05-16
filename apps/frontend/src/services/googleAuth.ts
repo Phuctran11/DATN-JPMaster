@@ -11,7 +11,7 @@ interface GoogleCredentialResponse {
 export const googleAuthService = {
   initGoogleSignIn(clientId: string, onSuccess: (token: string) => void, onError: (error: Error) => void) {
     if (!window.google) {
-      onError(new Error('❌ Google Sign-In library not loaded. Verify script tag in index.html'));
+      onError(new Error('Google Sign-In library not loaded. Verify script tag in index.html'));
       return;
     }
 
@@ -22,11 +22,11 @@ export const googleAuthService = {
           if (response.credential) {
             onSuccess(response.credential);
           } else {
-            onError(new Error('❌ No credential received from Google'));
+            onError(new Error('No credential received from Google'));
           }
         },
         error_callback: () => {
-          onError(new Error('❌ Google Sign-In initialization error. Check browser console for details.'));
+          onError(new Error('Google Sign-In initialization error. Check browser console for details.'));
         },
       });
     } catch (err) {
@@ -35,11 +35,11 @@ export const googleAuthService = {
       
       // Check for common issues
       if (message.includes('origin')) {
-        onError(new Error('❌ Origin not allowed. Add your current origin to Google Cloud Console > Credentials > JavaScript origins'));
+        onError(new Error('Origin not allowed. Add your current origin to Google Cloud Console > Credentials > JavaScript origins'));
       } else if (message.includes('client_id')) {
-        onError(new Error('❌ Invalid Client ID. Check VITE_GOOGLE_CLIENT_ID in .env.local'));
+        onError(new Error('Invalid Client ID. Check VITE_GOOGLE_CLIENT_ID in .env.local'));
       } else {
-        onError(new Error(`❌ ${message}`));
+        onError(new Error(`${message}`));
       }
     }
   },

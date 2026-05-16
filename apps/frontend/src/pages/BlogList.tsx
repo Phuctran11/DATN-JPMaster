@@ -1,9 +1,14 @@
-import { Header, Footer } from '../components';
+import { Header, Footer, Breadcrumbs } from '../components';
 import { Heading } from '../components/ui/Typography';
 import { BlogFilterBar } from '../components/sections/BlogFilterBar';
 import { BlogCard, FeaturedBlogCard } from '../components/cards';
 
 export default function BlogList() {
+  const breadcrumbs = [
+    { label: 'Home', path: '/' },
+    { label: 'Blog' },
+  ];
+
   const featuredPost = {
     title: 'Mastering Hiragana in Just 7 Days',
     category: 'Study Tips',
@@ -44,6 +49,7 @@ export default function BlogList() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
+      <Breadcrumbs items={breadcrumbs} />
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative h-[480px] w-full flex items-center overflow-hidden">

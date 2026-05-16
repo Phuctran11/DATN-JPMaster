@@ -1,4 +1,4 @@
-import { Header, Footer, Button, Card, Container, Icon } from '../components';
+import { Header, Footer, Button, Card, Container, Icon, Breadcrumbs } from '../components';
 import { Heading, Text } from '../components/ui/Typography';
 
 function FlashcardControlPanel() {
@@ -33,9 +33,16 @@ function InfoBentoCard({ icon, title, children }: { icon: string; title: string;
 }
 
 export default function FlashcardDetail() {
+  const breadcrumbs = [
+    { label: 'Home', path: '/' },
+    { label: 'Flashcards', path: '/flashcards' },
+    { label: 'Sample Collection' },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col bg-background" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2780%27 height=%2740%27 viewBox=%270 0 80 40%27%3E%3Cpath d=%27M0 40c4.5 0 9-2 12-5s7.5-3 12-3 9 2 12 5 7.5 3 12 3 9-2 12-5 7.5-3 12-3 9 2 12 5M0 20c4.5 0 9-2 12-5s7.5-3 12-3 9 2 12 5 7.5 3 12 3 9-2 12-5 7.5-3 12-3 9 2 12 5%27 fill=%27%23b6c4ff%27 fill-opacity=%270.08%27 fill-rule=%27evenodd%27/%3E%3C/svg%3E")' }}>
       <Header />
+      <Breadcrumbs items={breadcrumbs} />
       <main className="flex-grow pt-24 pb-section-gap px-margin-mobile md:px-margin-desktop relative">
         {/* Floating Petals Decorative Elements */}
         <div className="fixed top-[15%] left-[10%] w-3 h-3 bg-pink-200 rounded-full opacity-60 rotate-45 pointer-events-none"></div>

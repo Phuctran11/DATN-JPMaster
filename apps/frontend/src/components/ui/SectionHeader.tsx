@@ -1,5 +1,6 @@
 import { Heading, Text } from './Typography';
 import { Badge } from './index';
+import { Link } from 'react-router-dom';
 
 interface SectionHeaderProps {
   badge?: string;
@@ -34,13 +35,20 @@ export function SectionHeader({
         </Text>
       )}
       {cta && (
-        <a
-          href={cta.href}
-          className="inline-flex items-center gap-2 text-primary font-semibold hover:gap-3 transition-all"
-        >
-          {cta.label}
-          <span className="material-symbols-outlined">arrow_forward</span>
-        </a>
+        (cta.href && cta.href.startsWith('/')) ? (
+          <Link to={cta.href} className="inline-flex items-center gap-2 text-primary font-semibold hover:gap-3 transition-all">
+            {cta.label}
+            <span className="material-symbols-outlined">arrow_forward</span>
+          </Link>
+        ) : (
+          <a
+            href={cta.href}
+            className="inline-flex items-center gap-2 text-primary font-semibold hover:gap-3 transition-all"
+          >
+            {cta.label}
+            <span className="material-symbols-outlined">arrow_forward</span>
+          </a>
+        )
       )}
     </div>
   );
