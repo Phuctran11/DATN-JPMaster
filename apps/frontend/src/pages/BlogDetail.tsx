@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Header, Footer, Card } from '../components';
+import { Header, Footer, Card, Breadcrumbs } from '../components';
 import { Heading, Text } from '../components/ui/Typography';
 import { BlogCard } from '../components/cards';
 
@@ -30,6 +30,12 @@ function Comment({ name, date, quote, initials, bgColor }: CommentProps) {
 
 export default function BlogDetail() {
   const [comment, setComment] = useState('');
+
+  const breadcrumbs = [
+    { label: 'Home', path: '/' },
+    { label: 'Blog', path: '/blog' },
+    { label: 'Mastering Kanji: The Art of Focus' },
+  ];
 
   const blogPost = {
     title: 'Mastering Kanji: The Art of Focus',
@@ -89,6 +95,7 @@ export default function BlogDetail() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
+      <Breadcrumbs items={breadcrumbs} />
       <main className="flex-1">
         <div className="max-w-[1280px] mx-auto px-margin-desktop py-section-gap">
           <article className="max-w-4xl mx-auto">

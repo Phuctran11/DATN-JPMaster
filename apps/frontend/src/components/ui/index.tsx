@@ -13,14 +13,16 @@ export { IconButton } from './IconButton';
 export { SocialLinks } from './SocialLinks';
 export { FooterLinkColumn } from './FooterLinkColumn';
 
-interface CardProps {
-  className?: string;
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-export function Card({ className = '', children }: CardProps) {
+export function Card({ className = '', children, ...rest }: CardProps) {
   return (
-    <div className={`bg-white rounded-[2rem] border border-outline-variant/30 overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 ${className}`}>
+    <div
+      className={`bg-white rounded-[2rem] border border-outline-variant/30 overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 ${className}`}
+      {...rest}
+    >
       {children}
     </div>
   );

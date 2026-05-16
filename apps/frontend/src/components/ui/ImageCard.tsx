@@ -48,7 +48,7 @@ export function ImageCard({
       <img
         src={src}
         alt={alt}
-        className={`w-full h-full object-cover transition-transform ${hoverScaleClasses}`}
+        className={`w-full h-full object-cover object-center transition-transform ${hoverScaleClasses}`}
       />
       {(overlay?.gradient || overlay?.color) && <div className={overlayStyle} />}
       {badge && (

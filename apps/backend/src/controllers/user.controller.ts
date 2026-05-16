@@ -1,33 +1,46 @@
 import { Request, Response, NextFunction } from "express";
+import axios from "axios";
 import userModel from "../models/user.model.js";
 import passwordService from "../services/password.service.js";
+import tokenService from "../services/token.service.js";
 
 type UserRole = "guest" | "learner" | "admin";
 const VALID_ROLES: UserRole[] = ["guest", "learner", "admin"];
 
+interface GoogleTokenInfo {
+  aud?: string;
+  email?: string;
+  email_verified?: string | boolean;
+  iss?: string;
+  name?: string;
+  picture?: string;
+  sub?: string;
+}
+
+function createHttpError(message: string, status: number) {
+  const error = new Error(message) as Error & { status: number };
+  error.status = status;
+  return error;
+}
+
 export class UserController {
   async googleLogin(req: Request, res: Response, next: NextFunction) {
     try {
-      const { token } = req.body;
+      const { token: googleToken } = req.body;
+      const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
 
-      if (!token) {
+      if (!googleToken) {
         return res.status(400).json({ error: 'Token is required' });
       }
 
-      // Decode JWT token from Google (without verification for now)
-      // In production, verify the token with Google's API
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join('')
-      );
-      const googleData = JSON.parse(jsonPayload);
+      if (!googleClientId) {
+        throw createHttpError('GOOGLE_CLIENT_ID is not configured', 500);
+      }
+
+      const googleData = await this.verifyGoogleIdToken(googleToken, googleClientId);
 
       if (!googleData.email) {
-        return res.status(400).json({ error: 'Invalid token' });
+        throw createHttpError('Invalid Google token', 401);
       }
 
       const email = googleData.email;
@@ -42,9 +55,55 @@ export class UserController {
       }
 
       const { password_hash, ...userWithoutPassword } = user;
-      return res.status(200).json({ message: 'Google login successful', data: userWithoutPassword });
+      const token = tokenService.generateToken({
+        user_id: user.user_id,
+        email: user.email,
+        role: user.role,
+      });
+
+      return res.status(200).json({ message: 'Google login successful', data: userWithoutPassword, token });
     } catch (error) {
+      if (error instanceof Error && 'status' in error) {
+        const status = (error as Error & { status?: number }).status || 500;
+        return res.status(status).json({ error: error.message });
+      }
+
       next(error);
+    }
+  }
+
+  private async verifyGoogleIdToken(idToken: string, expectedClientId: string): Promise<GoogleTokenInfo> {
+    try {
+      const response = await axios.get<GoogleTokenInfo>('https://oauth2.googleapis.com/tokeninfo', {
+        params: { id_token: idToken },
+      });
+
+      const tokenInfo = response.data;
+      const emailVerified = tokenInfo.email_verified === true || tokenInfo.email_verified === 'true';
+
+      if (!tokenInfo.sub) {
+        throw createHttpError('Invalid Google token', 401);
+      }
+
+      if (tokenInfo.aud !== expectedClientId) {
+        throw createHttpError('Google token audience mismatch', 401);
+      }
+
+      if (tokenInfo.iss !== 'accounts.google.com' && tokenInfo.iss !== 'https://accounts.google.com') {
+        throw createHttpError('Invalid Google token issuer', 401);
+      }
+
+      if (!emailVerified) {
+        throw createHttpError('Google account email is not verified', 401);
+      }
+
+      return tokenInfo;
+    } catch (error) {
+      if (error instanceof Error && 'status' in error) {
+        throw error;
+      }
+
+      throw createHttpError('Failed to verify Google token', 401);
     }
   }
 
@@ -67,7 +126,13 @@ export class UserController {
       }
 
       const { password_hash, ...userWithoutPassword } = user;
-      return res.status(200).json({ message: "Login successful", data: userWithoutPassword });
+      const token = tokenService.generateToken({
+        user_id: user.user_id,
+        email: user.email,
+        role: user.role,
+      });
+
+      return res.status(200).json({ message: "Login successful", data: userWithoutPassword, token });
     } catch (error) {
       next(error);
     }
@@ -92,8 +157,13 @@ export class UserController {
 
       const passwordHash = await passwordService.hashPassword(password);
       const user = await userModel.createUser(username, email, passwordHash, role as UserRole);
+      const token = tokenService.generateToken({
+        user_id: user.user_id,
+        email: user.email,
+        role: user.role,
+      });
 
-      return res.status(201).json({ message: "User created successfully", data: user });
+      return res.status(201).json({ message: "User created successfully", data: user, token });
     } catch (error) {
       next(error);
     }

@@ -38,10 +38,9 @@
    - **Name**: JPMaster Web App
    - **JavaScript origins**: 
      - http://localhost:5173
-     - http://localhost:3000
    - **Authorized redirect URIs**:
-     - http://localhost:5173
-     - http://localhost:3000
+     - Không bắt buộc cho flow Google Identity Services hiện tại
+     - Chỉ thêm nếu bạn chuyển sang flow OAuth redirect / Passport / backend callback
 5. Click "Create"
 6. Copy **Client ID** (bạn sẽ cần nó)
 
@@ -57,18 +56,7 @@ VITE_GOOGLE_CLIENT_ID=YOUR_COPIED_CLIENT_ID_HERE
 
 ### 5.2 Cập nhật main.tsx
 
-Thêm Google Sign-In script vào `apps/frontend/src/main.tsx`:
-
-```typescript
-// Thêm trước ReactDOM.createRoot
-const script = document.createElement('script');
-script.src = 'https://accounts.google.com/gsi/client';
-script.async = true;
-script.defer = true;
-document.head.appendChild(script);
-```
-
-Hoặc thêm vào `apps/frontend/index.html` trong phần `<head>`:
+Thêm Google Sign-In script vào `apps/frontend/index.html` trong phần `<head>`:
 
 ```html
 <script src="https://accounts.google.com/gsi/client" async defer></script>

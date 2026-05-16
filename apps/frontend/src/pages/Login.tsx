@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Input, Button, PasswordInput } from '../components';
+import { Input, Button, PasswordInput, Breadcrumbs, Header, Footer } from '../components';
 import { authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -30,7 +30,7 @@ function LoginForm() {
     setLoading(true);
     try {
       const response = await authAPI.login(formData as any);
-      login(response.data);
+      login(response.data, response.token);
       addToast('Sign in successful!', 'success');
       navigate('/');
     } catch (err) {
@@ -91,9 +91,19 @@ function LoginForm() {
 }
 
 export default function Login() {
+  const breadcrumbs = [
+    { label: 'Home', path: '/' },
+    { label: 'Login' },
+  ];
+
   return (
-    <AuthLayout title="Welcome Back" subtitle="Continue your path to proficiency.">
-      <LoginForm />
-    </AuthLayout>
+    <div className="flex flex-col min-h-screen bg-background">
+      <Header />
+      <Breadcrumbs items={breadcrumbs} />
+      <AuthLayout title="Welcome Back" subtitle="Continue your path to proficiency.">
+        <LoginForm />
+      </AuthLayout>
+      <Footer />
+    </div>
   );
 }
