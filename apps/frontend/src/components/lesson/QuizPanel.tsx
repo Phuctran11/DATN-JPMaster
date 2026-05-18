@@ -179,6 +179,10 @@ export function QuizPanel({
     });
   };
 
+  const handleQuestionNoteDeleted = (noteId: number) => {
+    setQuestionNotes((previous) => previous.filter((note) => note.note_id !== noteId));
+  };
+
   const quizLabel = titlePrefix.toLowerCase().includes('final') ? 'final test' : 'quiz';
   const unansweredCount = quiz.questions.length - answeredCount;
 
@@ -327,6 +331,7 @@ export function QuizPanel({
                         placeholder="Why was this answer right or wrong?"
                         compact
                         onSaved={handleQuestionNoteSaved}
+                        onDeleted={handleQuestionNoteDeleted}
                       />
                     </div>
                   </details>

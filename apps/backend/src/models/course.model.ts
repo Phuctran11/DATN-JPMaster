@@ -61,6 +61,7 @@ export interface Course {
   updated_at: Date;
   average_rating?: number;
   rating_count?: number;
+  enroll_count?: number;
 }
 
 const formatCourse = (row: any): Course => ({
@@ -70,6 +71,7 @@ const formatCourse = (row: any): Course => ({
   final_quiz_id: row.final_quiz_id != null ? Number(row.final_quiz_id) : null,
   average_rating: row.average_rating != null ? Number(row.average_rating) : undefined,
   rating_count: row.rating_count != null ? Number(row.rating_count) : undefined,
+  enroll_count: row.enroll_count != null ? Number(row.enroll_count) : undefined,
 });
 
 const formatCourseWithLessons = (courseRow: any, lessons: Lesson[] = []): CourseWithLessons => ({
@@ -271,9 +273,11 @@ export class CourseModel {
         u.username AS creator_username,
         c.created_at, c.updated_at,
         AVG(cr.rating) AS average_rating,
-        COUNT(cr.rating_id) AS rating_count
+        COUNT(DISTINCT cr.rating_id) AS rating_count,
+        COUNT(DISTINCT e.enrollment_id) AS enroll_count
       FROM "Course" c
       LEFT JOIN "User" u ON u.user_id = c.created_by
+      LEFT JOIN "CourseEnrollment" e ON e.course_id = c.course_id
       LEFT JOIN "CourseRating" cr ON cr.course_id = c.course_id
       GROUP BY c.course_id, u.username
       ORDER BY c.created_at DESC

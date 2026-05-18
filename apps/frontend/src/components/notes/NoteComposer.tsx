@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { lessonNoteAPI, type LessonNote, type LessonNoteType } from '../../services/api';
+import { useToastMessages } from '../../hooks/useToastMessages';
 
 interface NoteComposerProps {
   lessonId?: number | null;
@@ -12,6 +13,7 @@ interface NoteComposerProps {
   placeholder?: string;
   compact?: boolean;
   onSaved?: (note: LessonNote) => void;
+  onDeleted?: (noteId: number) => void;
   onCreated?: () => void;
   onCancel?: () => void;
 }
@@ -26,9 +28,23 @@ const typeLabels: Record<LessonNoteType, string> = {
 
 const formatTimestamp = (seconds?: number | null) => {
   if (seconds == null) return null;
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  return `${minutes}:${String(rest).padStart(2, '0')}`;
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const rest = safeSeconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+};
+
+const parseTimestamp = (value: string) => {
+  const parts = value.trim().split(':').map((part) => Number(part));
+  if (parts.length === 0 || parts.length > 3 || parts.some((part) => Number.isNaN(part) || part < 0)) {
+    return null;
+  }
+
+  const [hoursOrMinutes = 0, minutesOrSeconds = 0, seconds = 0] = parts;
+  if (parts.length === 1) return Math.floor(hoursOrMinutes);
+  if (parts.length === 2) return Math.floor(hoursOrMinutes * 60 + minutesOrSeconds);
+  return Math.floor(hoursOrMinutes * 3600 + minutesOrSeconds * 60 + seconds);
 };
 
 export function NoteComposer({
@@ -42,14 +58,17 @@ export function NoteComposer({
   placeholder = 'Write your note...',
   compact = false,
   onSaved,
+  onDeleted,
   onCreated,
   onCancel,
 }: NoteComposerProps) {
+  const toast = useToastMessages();
   const [content, setContent] = useState(existingNote?.note_content ?? '');
   const [isPinned, setIsPinned] = useState(Boolean(existingNote?.is_pinned));
   const [timestampSeconds, setTimestampSeconds] = useState<number | null>(
     videoTimestampSeconds ?? existingNote?.video_timestamp_seconds ?? null
   );
+  const [timestampInput, setTimestampInput] = useState(formatTimestamp(videoTimestampSeconds ?? existingNote?.video_timestamp_seconds ?? 0) ?? '00:00:00');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timestampLabel = formatTimestamp(timestampSeconds);
@@ -58,11 +77,19 @@ export function NoteComposer({
   useEffect(() => {
     setContent(existingNote?.note_content ?? '');
     setIsPinned(Boolean(existingNote?.is_pinned));
-    setTimestampSeconds(videoTimestampSeconds ?? existingNote?.video_timestamp_seconds ?? null);
+    const nextTimestamp = videoTimestampSeconds ?? existingNote?.video_timestamp_seconds ?? null;
+    setTimestampSeconds(nextTimestamp);
+    setTimestampInput(formatTimestamp(nextTimestamp ?? 0) ?? '00:00:00');
   }, [existingNote?.note_id, existingNote?.note_content, existingNote?.is_pinned, existingNote?.video_timestamp_seconds, videoTimestampSeconds]);
 
   const handleSubmit = async () => {
     if (!content.trim() || saving) return;
+    const parsedTimestamp = noteType === 'video_note' ? parseTimestamp(timestampInput) : timestampSeconds;
+    if (noteType === 'video_note' && parsedTimestamp == null) {
+      setError('Timestamp must use hh:mm:ss, mm:ss, or seconds format.');
+      toast.error('Timestamp must use hh:mm:ss, mm:ss, or seconds format.');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -71,7 +98,7 @@ export function NoteComposer({
         ? await lessonNoteAPI.updateNote(existingNote.note_id, {
             note_content: content.trim(),
             selected_text: selectedTextValue?.trim() || null,
-            video_timestamp_seconds: timestampSeconds,
+            video_timestamp_seconds: parsedTimestamp,
             is_pinned: isPinned,
           })
         : await lessonNoteAPI.createNote({
@@ -80,17 +107,40 @@ export function NoteComposer({
             note_type: noteType,
             note_content: content.trim(),
             selected_text: selectedTextValue?.trim() || null,
-            video_timestamp_seconds: timestampSeconds,
+            video_timestamp_seconds: parsedTimestamp,
             is_pinned: isPinned,
           });
       if (!existingNote) {
         setContent('');
         setIsPinned(false);
       }
+      setTimestampSeconds(parsedTimestamp);
       onSaved?.(result.data);
       onCreated?.();
+      toast.success(existingNote ? 'Note updated successfully.' : 'Note created successfully.');
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save note');
+      const message = saveError instanceof Error ? saveError.message : 'Failed to save note';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!existingNote || saving) return;
+
+    try {
+      setSaving(true);
+      setError(null);
+      await lessonNoteAPI.deleteNote(existingNote.note_id);
+      onDeleted?.(existingNote.note_id);
+      onCancel?.();
+      toast.success('Note deleted successfully.');
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : 'Failed to delete note';
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -123,13 +173,19 @@ export function NoteComposer({
 
       {noteType === 'video_note' && (
         <label className="block">
-          <span className="mb-1 block text-label-md font-bold text-on-surface">Timestamp seconds</span>
+          <span className="mb-1 block text-label-md font-bold text-on-surface">Timestamp</span>
           <input
-            type="number"
-            min={0}
-            value={timestampSeconds ?? 0}
-            onChange={(event) => setTimestampSeconds(Math.max(0, Number(event.target.value) || 0))}
+            type="text"
+            inputMode="numeric"
+            value={timestampInput}
+            onChange={(event) => {
+              setTimestampInput(event.target.value);
+              const parsed = parseTimestamp(event.target.value);
+              if (parsed != null) setTimestampSeconds(parsed);
+            }}
+            onBlur={() => setTimestampInput(formatTimestamp(parseTimestamp(timestampInput) ?? 0) ?? '00:00:00')}
             className="w-full rounded-lg border border-outline-variant bg-white px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary"
+            placeholder="00:01:23"
           />
         </label>
       )}
@@ -145,6 +201,16 @@ export function NoteComposer({
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-body-sm text-red-700">{error}</p>}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {existingNote && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={saving}
+            className="rounded-lg border border-red-200 bg-white px-4 py-2 font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Delete
+          </button>
+        )}
         {onCancel && (
           <button
             type="button"

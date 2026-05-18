@@ -1,13 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon, IconButton } from '../ui';
 
 export function NotificationBell() {
   const [showNotifications, setShowNotifications] = useState(false);
+  const notificationRef = useRef<HTMLDivElement | null>(null);
   const notifications: any[] = [];
   const unreadCount = notifications.length;
 
+  useEffect(() => {
+    if (!showNotifications) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!notificationRef.current?.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [showNotifications]);
+
   return (
-    <div className="relative">
+    <div ref={notificationRef} className="relative">
       <IconButton
         icon="notifications"
         size="md"
