@@ -8,6 +8,8 @@ import flashcardRoutes from "./routes/flashcard.routes.js";
 import purchaseRoutes from "./routes/purchase.routes.js";
 import enrollmentRoutes from "./routes/enrollment.routes.js";
 import ratingRoutes from "./routes/rating.routes.js";
+import quizRoutes from "./routes/quiz.routes.js";
+import lessonNoteRoutes from "./routes/lessonNote.routes.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 
 dotenv.config();
@@ -27,6 +29,8 @@ app.use("/api/flashcards", flashcardRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/purchases", purchaseRoutes);
 app.use("/api/ratings", ratingRoutes);
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/lesson-notes", lessonNoteRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -29,6 +29,11 @@ router.get("/course/:courseId/next-lesson", authMiddleware, (req, res, next) =>
   enrollmentController.getNextLessonForCourse(req, res, next)
 );
 
+// Mark lesson as completed
+router.put("/course/:courseId/lessons/:lessonId/complete", authMiddleware, (req, res, next) =>
+  enrollmentController.markLessonCompleted(req, res, next)
+);
+
 // Enroll user in a course
 router.post("/enroll", authMiddleware, (req, res, next) =>
   enrollmentController.enrollCourse(req, res, next)

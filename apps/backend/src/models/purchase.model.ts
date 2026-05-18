@@ -10,9 +10,7 @@ export interface Purchase {
   course_id: number;
   purchase_date: Date;
   price_paid: number;
-  voucher_id?: number;
   status: 'pending' | 'completed' | 'canceled';
-  purchase_type: 'standard' | 'voucher';
 }
 
 /**
@@ -24,9 +22,7 @@ const formatPurchase = (row: any): Purchase => ({
   course_id: row.course_id,
   purchase_date: row.purchase_date,
   price_paid: Number(row.price_paid),
-  voucher_id: row.voucher_id || undefined,
   status: row.status,
-  purchase_type: row.purchase_type,
 });
 
 /**
@@ -49,8 +45,6 @@ export class PurchaseModel {
    * @param courseId - Course ID being purchased
    * @param pricePaid - Amount paid (0 for free courses)
    * @param status - Purchase status (default: 'completed')
-   * @param voucherId - Optional voucher ID if voucher was applied
-   * @param purchaseType - Type of purchase: 'standard' or 'voucher' (default: 'standard')
    * @returns Created Purchase record
    * @throws Error if database fails
    */
@@ -58,18 +52,14 @@ export class PurchaseModel {
     userId: number,
     courseId: number,
     pricePaid: number,
-    status: 'pending' | 'completed' | 'canceled' = 'completed',
-    voucherId?: number,
-    purchaseType: 'standard' | 'voucher' = 'standard'
+    status: 'pending' | 'completed' | 'canceled' = 'completed'
   ): Promise<Purchase> {
     const query = `
       INSERT INTO "Purchase" (
-        user_id, course_id, price_paid, status, 
-        voucher_id, purchase_type, purchase_date
+        user_id, course_id, price_paid, status, purchase_date
       )
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      RETURNING purchase_id, user_id, course_id, purchase_date, 
-                price_paid, voucher_id, status, purchase_type;
+      VALUES ($1, $2, $3, $4, NOW())
+      RETURNING purchase_id, user_id, course_id, purchase_date, price_paid, status;
     `;
 
     try {
@@ -78,8 +68,6 @@ export class PurchaseModel {
         courseId,
         pricePaid,
         status,
-        voucherId || null,
-        purchaseType,
       ]);
 
       if (!result.rows[0]) {
@@ -103,8 +91,7 @@ export class PurchaseModel {
    */
   async getPurchaseById(purchaseId: number): Promise<Purchase | null> {
     const query = `
-      SELECT purchase_id, user_id, course_id, purchase_date, 
-             price_paid, voucher_id, status, purchase_type
+      SELECT purchase_id, user_id, course_id, purchase_date, price_paid, status
       FROM "Purchase"
       WHERE purchase_id = $1;
     `;
@@ -133,8 +120,7 @@ export class PurchaseModel {
     const limitSafe = Math.min(limit, 100);
 
     const query = `
-      SELECT purchase_id, user_id, course_id, purchase_date, 
-             price_paid, voucher_id, status, purchase_type
+      SELECT purchase_id, user_id, course_id, purchase_date, price_paid, status
       FROM "Purchase"
       WHERE user_id = $1 AND status = 'completed'
       ORDER BY purchase_date DESC
@@ -168,8 +154,7 @@ export class PurchaseModel {
       UPDATE "Purchase"
       SET status = $1
       WHERE purchase_id = $2
-      RETURNING purchase_id, user_id, course_id, purchase_date, 
-                price_paid, voucher_id, status, purchase_type;
+      RETURNING purchase_id, user_id, course_id, purchase_date, price_paid, status;
     `;
 
     try {
@@ -214,8 +199,7 @@ export class PurchaseModel {
    */
   async getPurchaseByUserAndCourse(userId: number, courseId: number): Promise<Purchase | null> {
     const query = `
-      SELECT purchase_id, user_id, course_id, purchase_date, 
-             price_paid, voucher_id, status, purchase_type
+      SELECT purchase_id, user_id, course_id, purchase_date, price_paid, status
       FROM "Purchase"
       WHERE user_id = $1 AND course_id = $2
       ORDER BY purchase_date DESC

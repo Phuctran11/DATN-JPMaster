@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { AuthenticatedRequest } from "../middlewares/auth.middleware.js";
 import axios from "axios";
 import userModel from "../models/user.model.js";
 import passwordService from "../services/password.service.js";
@@ -24,6 +25,12 @@ function createHttpError(message: string, status: number) {
 }
 
 export class UserController {
+  private toPublicUser(user: Awaited<ReturnType<typeof userModel.getUserById>>) {
+    if (!user) return null;
+    const { password_hash, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
+
   async googleLogin(req: Request, res: Response, next: NextFunction) {
     try {
       const { token: googleToken } = req.body;
@@ -176,6 +183,56 @@ export class UserController {
 
       const users = await userModel.getAllUsers(limit, offset);
       return res.status(200).json({ data: users, count: users.length });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const user = await userModel.getUserById(req.user.user_id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      return res.status(200).json({ data: this.toPublicUser(user) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { username, email } = req.body;
+      const nextUsername = typeof username === "string" ? username.trim() : "";
+      const nextEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+
+      if (!nextUsername || !nextEmail) {
+        return res.status(400).json({ error: "username and email are required" });
+      }
+
+      const existingEmailUser = await userModel.getUserByEmail(nextEmail);
+      if (existingEmailUser && existingEmailUser.user_id !== req.user.user_id) {
+        return res.status(409).json({ error: "Email already exists" });
+      }
+
+      const updatedUser = await userModel.updateUserProfile(req.user.user_id, nextUsername, nextEmail);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      return res.status(200).json({
+        message: "Profile updated successfully",
+        data: this.toPublicUser(updatedUser),
+      });
     } catch (error) {
       next(error);
     }

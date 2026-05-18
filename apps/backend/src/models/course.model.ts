@@ -5,10 +5,12 @@ export interface Lesson {
   lesson_id: number;
   course_id: number;
   title: string;
-  content_type: 'video' | 'text' | 'flashcard' | 'quiz';
+  content_type: 'video' | 'text' | 'quiz';
   content_text: string | null;
   video_url: string | null;
   order_index: number;
+  duration: number | null;
+  created_by: number;
   created_at: Date;
   updated_at: Date;
   is_completed?: boolean;
@@ -30,7 +32,10 @@ export interface CourseWithLessons {
   price: number;
   level: string | null;
   is_free: boolean;
+  duration: number | null;
   created_by: number;
+  final_quiz_id: number | null;
+  creator_username?: string;
   created_at: Date;
   updated_at: Date;
   lessons?: Lesson[];
@@ -48,20 +53,32 @@ export interface Course {
   description: string | null;
   price: number;
   level: string | null;
+  duration: number | null;
   created_by: number;
+  final_quiz_id: number | null;
+  creator_username?: string;
   created_at: Date;
   updated_at: Date;
+  average_rating?: number;
+  rating_count?: number;
 }
 
 const formatCourse = (row: any): Course => ({
   ...row,
   price: Number(row.price),
+  duration: row.duration != null ? Number(row.duration) : null,
+  final_quiz_id: row.final_quiz_id != null ? Number(row.final_quiz_id) : null,
+  average_rating: row.average_rating != null ? Number(row.average_rating) : undefined,
+  rating_count: row.rating_count != null ? Number(row.rating_count) : undefined,
 });
 
 const formatCourseWithLessons = (courseRow: any, lessons: Lesson[] = []): CourseWithLessons => ({
   ...courseRow,
   price: Number(courseRow.price),
+  duration: courseRow.duration != null ? Number(courseRow.duration) : null,
+  final_quiz_id: courseRow.final_quiz_id != null ? Number(courseRow.final_quiz_id) : null,
   is_free: Number(courseRow.price) === 0,
+  creator_username: courseRow.creator_username,
   lessons,
 });
 
@@ -75,7 +92,7 @@ export class CourseModel {
     const query = `
       INSERT INTO "Course" (title, description, price, level, created_by, created_at, updated_at)
       VALUES ($1, $2, $3, NULL, $4, NOW(), NOW())
-      RETURNING course_id, title, description, price, level, created_by, created_at, updated_at;
+      RETURNING course_id, title, description, price, level, duration, created_by, final_quiz_id, created_at, updated_at;
     `;
     const result = await databaseService.executeQuery(query, [title, description, price, createdBy]);
     return formatCourse(result.rows[0]);
@@ -83,9 +100,13 @@ export class CourseModel {
 
   async getCourseById(courseId: number): Promise<Course | null> {
     const query = `
-      SELECT course_id, title, description, price, level, created_by, created_at, updated_at
-      FROM "Course"
-      WHERE course_id = $1;
+      SELECT
+        c.course_id, c.title, c.description, c.price, c.level, c.duration, c.created_by, c.final_quiz_id,
+        u.username AS creator_username,
+        c.created_at, c.updated_at
+      FROM "Course" c
+      LEFT JOIN "User" u ON u.user_id = c.created_by
+      WHERE c.course_id = $1;
     `;
     const result = await databaseService.executeQuery(query, [courseId]);
     return result.rows[0] ? formatCourse(result.rows[0]) : null;
@@ -93,9 +114,13 @@ export class CourseModel {
 
   async getCourseByIdWithLessons(courseId: number): Promise<CourseWithLessons | null> {
     const query = `
-      SELECT course_id, title, description, price, level, created_by, created_at, updated_at
-      FROM "Course"
-      WHERE course_id = $1;
+      SELECT
+        c.course_id, c.title, c.description, c.price, c.level, c.duration, c.created_by, c.final_quiz_id,
+        u.username AS creator_username,
+        c.created_at, c.updated_at
+      FROM "Course" c
+      LEFT JOIN "User" u ON u.user_id = c.created_by
+      WHERE c.course_id = $1;
     `;
     const result = await databaseService.executeQuery(query, [courseId]);
     if (!result.rows[0]) return null;
@@ -103,10 +128,21 @@ export class CourseModel {
     let lessons: Lesson[] = [];
     try {
       const lessonsQuery = `
-        SELECT lesson_id, course_id, title, content_type, content_text, video_url, order_index, created_at, updated_at
-        FROM "Lesson"
-        WHERE course_id = $1
-        ORDER BY order_index ASC;
+        SELECT
+          l.lesson_id,
+          l.course_id,
+          l.title,
+          l.content_type,
+          l.content_text,
+          l.video_url,
+          l.order_index,
+          (to_jsonb(l)->>'duration')::int AS duration,
+          (to_jsonb(l)->>'created_by')::int AS created_by,
+          l.created_at,
+          l.updated_at
+        FROM "Lesson" l
+        WHERE l.course_id = $1
+        ORDER BY l.order_index ASC;
       `;
       const lessonsResult = await databaseService.executeQuery(lessonsQuery, [courseId]);
       lessons = lessonsResult.rows;
@@ -167,7 +203,18 @@ export class CourseModel {
 
   async getNextUnfinishedLessonByUserAndCourse(userId: number, courseId: number): Promise<Lesson | null> {
     const query = `
-      SELECT l.lesson_id, l.course_id, l.title, l.content_type, l.content_text, l.video_url, l.order_index, l.created_at, l.updated_at
+      SELECT
+        l.lesson_id,
+        l.course_id,
+        l.title,
+        l.content_type,
+        l.content_text,
+        l.video_url,
+        l.order_index,
+        (to_jsonb(l)->>'duration')::int AS duration,
+        (to_jsonb(l)->>'created_by')::int AS created_by,
+        l.created_at,
+        l.updated_at
       FROM "Lesson" l
       LEFT JOIN "UserLessonProgress" ulp
         ON ulp.lesson_id = l.lesson_id AND ulp.user_id = $1
@@ -219,9 +266,17 @@ export class CourseModel {
 
   async getAllCourses(limit: number = 10, offset: number = 0): Promise<Course[]> {
     const query = `
-      SELECT course_id, title, description, price, level, created_by, created_at, updated_at
-      FROM "Course"
-      ORDER BY created_at DESC
+      SELECT
+        c.course_id, c.title, c.description, c.price, c.level, c.duration, c.created_by, c.final_quiz_id,
+        u.username AS creator_username,
+        c.created_at, c.updated_at,
+        AVG(cr.rating) AS average_rating,
+        COUNT(cr.rating_id) AS rating_count
+      FROM "Course" c
+      LEFT JOIN "User" u ON u.user_id = c.created_by
+      LEFT JOIN "CourseRating" cr ON cr.course_id = c.course_id
+      GROUP BY c.course_id, u.username
+      ORDER BY c.created_at DESC
       LIMIT $1 OFFSET $2;
     `;
     const result = await databaseService.executeQuery(query, [limit, offset]);
@@ -230,11 +285,18 @@ export class CourseModel {
 
   async getPopularCourses(limit: number = 4): Promise<Course[]> {
     const query = `
-      SELECT c.course_id, c.title, c.description, c.price, c.level, c.created_by, c.created_at, c.updated_at,
-             COUNT(e.enrollment_id) AS enroll_count
+      SELECT
+        c.course_id, c.title, c.description, c.price, c.level, c.duration, c.created_by, c.final_quiz_id,
+        u.username AS creator_username,
+        c.created_at, c.updated_at,
+        COUNT(DISTINCT e.enrollment_id) AS enroll_count,
+        AVG(cr.rating) AS average_rating,
+        COUNT(DISTINCT cr.rating_id) AS rating_count
       FROM "Course" c
+      LEFT JOIN "User" u ON u.user_id = c.created_by
       LEFT JOIN "CourseEnrollment" e ON e.course_id = c.course_id
-      GROUP BY c.course_id
+      LEFT JOIN "CourseRating" cr ON cr.course_id = c.course_id
+      GROUP BY c.course_id, u.username
       ORDER BY enroll_count DESC, c.created_at DESC
       LIMIT $1;
     `;
@@ -244,9 +306,19 @@ export class CourseModel {
 
   async getCoursesByCreator(createdBy: number, limit: number = 10, offset: number = 0): Promise<Course[]> {
     const query = `
-      SELECT course_id, title, description, price, level, created_by, created_at, updated_at
-      FROM "Course"
-      WHERE created_by = $1
+      SELECT
+        c.course_id,
+        c.title,
+        c.description,
+        c.price,
+        c.level,
+        c.duration,
+        c.created_by,
+        c.final_quiz_id,
+        c.created_at,
+        c.updated_at
+      FROM "Course" c
+      WHERE c.created_by = $1
       ORDER BY created_at DESC
       LIMIT $2 OFFSET $3;
     `;
@@ -264,7 +336,7 @@ export class CourseModel {
       UPDATE "Course"
       SET title = $1, description = $2, price = $3, updated_at = NOW()
       WHERE course_id = $4
-      RETURNING course_id, title, description, price, level, created_by, created_at, updated_at;
+      RETURNING course_id, title, description, price, level, duration, created_by, final_quiz_id, created_at, updated_at;
     `;
     const result = await databaseService.executeQuery(query, [title, description, price, courseId]);
     return result.rows[0] ? formatCourse(result.rows[0]) : null;
@@ -272,13 +344,47 @@ export class CourseModel {
 
   async getFirstLessonByCourseId(courseId: number): Promise<Lesson | null> {
     const query = `
-      SELECT lesson_id, course_id, title, content_type, content_text, video_url, order_index, created_at, updated_at
-      FROM "Lesson"
-      WHERE course_id = $1
-      ORDER BY order_index ASC
+      SELECT
+        l.lesson_id,
+        l.course_id,
+        l.title,
+        l.content_type,
+        l.content_text,
+        l.video_url,
+        l.order_index,
+        (to_jsonb(l)->>'duration')::int AS duration,
+        (to_jsonb(l)->>'created_by')::int AS created_by,
+        l.created_at,
+        l.updated_at
+      FROM "Lesson" l
+      WHERE l.course_id = $1
+      ORDER BY l.order_index ASC
       LIMIT 1;
     `;
     const result = await databaseService.executeQuery(query, [courseId]);
+    return result.rows[0] || null;
+  }
+
+  async getLessonByCourseAndLessonId(courseId: number, lessonId: number): Promise<Lesson | null> {
+    const query = `
+      SELECT
+        l.lesson_id,
+        l.course_id,
+        l.title,
+        l.content_type,
+        l.content_text,
+        l.video_url,
+        l.order_index,
+        (to_jsonb(l)->>'duration')::int AS duration,
+        (to_jsonb(l)->>'created_by')::int AS created_by,
+        l.created_at,
+        l.updated_at
+      FROM "Lesson" l
+      WHERE l.course_id = $1 AND l.lesson_id = $2
+      LIMIT 1;
+    `;
+
+    const result = await databaseService.executeQuery(query, [courseId, lessonId]);
     return result.rows[0] || null;
   }
 

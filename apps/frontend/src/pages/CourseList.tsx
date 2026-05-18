@@ -20,7 +20,7 @@ export default function CourseList() {
       try {
         setLoading(true);
         setError(null);
-        const response = await enrollmentAPI.getMyCoursesByStatus(activeStatus);
+        const response = await enrollmentAPI.getMyCourses();
         setCourses(response.data);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load courses';
@@ -33,7 +33,7 @@ export default function CourseList() {
     };
 
     fetchCourses();
-  }, [activeStatus]);
+  }, []);
 
   const handleOpenCourseDetail = (courseId: number) => {
     navigate(`/courses/${courseId}`);
@@ -41,6 +41,12 @@ export default function CourseList() {
 
   const handleGetStarted = async (courseId: number) => {
     try {
+      const enrollment = courses.find((item) => item.course_id === courseId);
+      if (enrollment?.course.lessons?.length && enrollment.status === 'active' && (enrollment.progress_percent ?? 0) >= 100) {
+        navigate(`/courses/${courseId}/final-test`);
+        return;
+      }
+
       const lessonResult = await enrollmentAPI.getNextLesson(courseId);
       navigate(`/courses/${courseId}/lessons/${lessonResult.data.lesson_id}`);
     } catch (err) {
@@ -50,11 +56,25 @@ export default function CourseList() {
     }
   };
 
+  const handleViewCertificate = (courseId: number) => {
+    navigate(`/courses/${courseId}/certificate`);
+  };
+
+  const handleTakeFinalTest = (courseId: number) => {
+    navigate(`/courses/${courseId}/final-test`);
+  };
+
+  const getEffectiveStatus = (enrollment: EnrolledCourse): 'active' | 'completed' | 'dropped' => {
+    return enrollment.status;
+  };
+
   const getStatusLabel = (status: 'active' | 'completed' | 'dropped'): 'In Progress' | 'Completed' | 'Not Started' => {
     if (status === 'active') return 'In Progress';
     if (status === 'completed') return 'Completed';
     return 'Not Started';
   };
+
+  const visibleCourses = courses.filter((enrollment) => getEffectiveStatus(enrollment) === activeStatus);
 
   const breadcrumbs = [
     { label: 'Home', path: '/' },
@@ -119,7 +139,7 @@ export default function CourseList() {
                     Loading courses...
                   </Text>
                 </div>
-              ) : courses.length === 0 ? (
+              ) : visibleCourses.length === 0 ? (
                 <Card className="p-8 text-center border border-outline-variant">
                   <Text variant="body-lg" color="on-surface-variant">
                     No courses found. Start exploring and enroll in a course!
@@ -127,19 +147,27 @@ export default function CourseList() {
                 </Card>
               ) : (
                 <div className="flex flex-col gap-gutter">
-                  {courses.map((enrollment) => (
+                  {visibleCourses.map((enrollment) => {
+                    const effectiveStatus = getEffectiveStatus(enrollment);
+                    const needsFinalTest = effectiveStatus === 'active' && (enrollment.progress_percent ?? 0) >= 99.99;
+
+                    return (
                     <div key={enrollment.enrollment_id} className="w-full">
                       <MyLearningCard
                         courseId={enrollment.course_id}
                         title={enrollment.course.title}
-                        progress={enrollment.progress_percent ?? (activeStatus === 'completed' ? 100 : 0)}
-                        status={getStatusLabel(enrollment.status)}
+                        progress={enrollment.progress_percent ?? (effectiveStatus === 'completed' ? 100 : 0)}
+                        status={getStatusLabel(effectiveStatus)}
+                        needsFinalTest={needsFinalTest}
                         image={courseImage}
                         onClick={handleOpenCourseDetail}
                         onGetStarted={handleGetStarted}
+                        onTakeFinalTest={handleTakeFinalTest}
+                        onViewCertificate={handleViewCertificate}
                       />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

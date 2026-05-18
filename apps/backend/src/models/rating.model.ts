@@ -118,23 +118,54 @@ export class RatingModel {
     return (result.rowCount ?? 0) > 0;
   }
 
-  async getTopRatedCoursesWithReviews(limit: number = 3): Promise<Array<{ course_id: number; course_title: string; average_rating: number; rating_id: number; user_id: number; username: string; rating: number; review: string | null; created_at: Date }>> {
+  async getTopRatedCoursesWithReviews(limit: number = 3): Promise<Array<{ course_id: number; course_title: string; average_rating: number; rating_count: number; rating_id: number; user_id: number; username: string; rating: number; review: string | null; created_at: Date }>> {
     const query = `
-      SELECT DISTINCT ON (c.course_id)
-        c.course_id,
-        c.title as course_title,
-        COALESCE(AVG(cr.rating) OVER (PARTITION BY c.course_id), 0) as average_rating,
-        cr.rating_id,
-        cr.user_id,
-        u.username,
-        cr.rating,
-        cr.review,
-        cr.created_at
-      FROM "Course" c
-      LEFT JOIN "CourseRating" cr ON c.course_id = cr.course_id
-      LEFT JOIN "User" u ON cr.user_id = u.user_id
-      WHERE cr.rating_id IS NOT NULL
-      ORDER BY c.course_id, cr.created_at DESC, COALESCE(AVG(cr.rating) OVER (PARTITION BY c.course_id), 0) DESC
+      WITH course_ranking AS (
+        SELECT
+          c.course_id,
+          c.title AS course_title,
+          AVG(cr.rating) AS average_rating,
+          COUNT(cr.rating_id) AS rating_count
+        FROM "Course" c
+        JOIN "CourseRating" cr ON c.course_id = cr.course_id
+        GROUP BY c.course_id, c.title
+      ),
+      newest_course_reviews AS (
+        SELECT
+          cr.rating_id,
+          cr.course_id,
+          cr.user_id,
+          u.username,
+          cr.rating,
+          cr.review,
+          cr.created_at,
+          ROW_NUMBER() OVER (
+            PARTITION BY cr.course_id
+            ORDER BY cr.created_at DESC, cr.rating_id DESC
+          ) AS row_number
+        FROM "CourseRating" cr
+        JOIN "User" u ON cr.user_id = u.user_id
+      )
+      SELECT
+        course_ranking.course_id,
+        course_ranking.course_title,
+        course_ranking.average_rating,
+        course_ranking.rating_count,
+        newest_course_reviews.rating_id,
+        newest_course_reviews.user_id,
+        newest_course_reviews.username,
+        newest_course_reviews.rating,
+        newest_course_reviews.review,
+        newest_course_reviews.created_at
+      FROM course_ranking
+      JOIN newest_course_reviews
+        ON newest_course_reviews.course_id = course_ranking.course_id
+        AND newest_course_reviews.row_number = 1
+      ORDER BY
+        course_ranking.average_rating DESC,
+        newest_course_reviews.created_at DESC,
+        course_ranking.rating_count DESC,
+        course_ranking.course_id ASC
       LIMIT $1;
     `;
     const result = await databaseService.executeQuery(query, [limit]);
@@ -142,6 +173,7 @@ export class RatingModel {
       ...row,
       rating: Number(row.rating),
       average_rating: Number(row.average_rating),
+      rating_count: Number(row.rating_count),
     }));
   }
 }

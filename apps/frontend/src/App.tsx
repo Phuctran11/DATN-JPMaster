@@ -8,9 +8,13 @@ const Homepage = lazy(() => import('./pages/Homepage'));
 const CourseList = lazy(() => import('./pages/CourseList'));
 const CourseExplore = lazy(() => import('./pages/CourseExplore'));
 const CourseDetail = lazy(() => import('./pages/CourseDetail'));
+const Certification = lazy(() => import('./pages/Certification'));
+const Profile = lazy(() => import('./pages/Profile'));
 const Lesson = lazy(() => import('./pages/Lesson'));
+const QuizFocus = lazy(() => import('./pages/QuizFocus'));
 const Flashcard = lazy(() => import('./pages/Flashcard'));
 const FlashcardDetail = lazy(() => import('./pages/FlashcardDetail'));
+const Notes = lazy(() => import('./pages/Notes'));
 const BlogList = lazy(() => import('./pages/BlogList'));
 const BlogDetail = lazy(() => import('./pages/BlogDetail'));
 const TestList = lazy(() => import('./pages/TestList'));
@@ -35,9 +39,14 @@ function App() {
               <Route path="/courses" element={<CourseList />} />
               <Route path="/explore" element={<CourseExplore />} />
               <Route path="/courses/:id" element={<CourseDetail />} />
+              <Route path="/courses/:id/certificate" element={<Certification />} />
               <Route path="/courses/:id/lessons/:lessonId" element={<Lesson />} />
+              <Route path="/courses/:id/lessons/:lessonId/quiz" element={<QuizFocus />} />
+              <Route path="/courses/:id/final-test" element={<QuizFocus />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/flashcards" element={<Flashcard />} />
               <Route path="/flashcards/:id" element={<FlashcardDetail />} />
+              <Route path="/notes" element={<Notes />} />
               <Route path="/tests" element={<TestList />} />
               <Route path="/blog" element={<BlogList />} />
               <Route path="/blog/:id" element={<BlogDetail />} />

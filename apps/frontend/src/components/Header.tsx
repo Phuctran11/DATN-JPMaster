@@ -21,12 +21,16 @@ export function Header() {
     { path: '/courses', label: 'My learning' },
     { path: '/explore', label: 'Explore' },
     { path: '/flashcards', label: 'Flashcards' },
+    { path: '/notes', label: 'Notes' },
     { path: '/tests', label: 'Tests' },
     { path: '/blog', label: 'Blog' },
   ];
 
   return (
-    <header className="bg-gradient-to-b from-surface/95 to-surface-container/90 backdrop-blur-md sticky top-0 z-50 border-b-2 border-outline-variant/30">
+    <header
+      data-app-header
+      className="bg-gradient-to-b from-surface/95 to-surface-container/90 backdrop-blur-md sticky top-0 z-50 border-b-2 border-outline-variant/30"
+    >
       <div className="flex justify-between items-center max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-4 gap-2 md:gap-4">
         {/* Logo */}
         <Link

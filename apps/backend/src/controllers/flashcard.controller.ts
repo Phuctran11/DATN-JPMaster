@@ -6,9 +6,9 @@ export class FlashcardController {
     try {
       const { user_id, word, meaning, example_sentence, lesson_id } = req.body;
 
-      if (!user_id || !word || !meaning || !example_sentence) {
+      if (!user_id || !lesson_id || !word || !meaning) {
         return res.status(400).json({
-          error: "user_id, word, meaning, và example_sentence là bắt buộc",
+          error: "user_id, lesson_id, word, and meaning are required",
         });
       }
 
@@ -16,16 +16,16 @@ export class FlashcardController {
         return res.status(400).json({ error: "user_id phải là một số" });
       }
 
-      if (lesson_id && isNaN(Number(lesson_id))) {
-        return res.status(400).json({ error: "lesson_id phải là một số" });
+      if (isNaN(Number(lesson_id))) {
+        return res.status(400).json({ error: "lesson_id must be a number" });
       }
 
       const flashcard = await flashcardModel.createFlashcard(
         Number(user_id),
         word,
         meaning,
-        example_sentence,
-        lesson_id ? Number(lesson_id) : undefined
+        Number(lesson_id),
+        example_sentence
       );
 
       return res.status(201).json({
@@ -179,9 +179,9 @@ export class FlashcardController {
         return res.status(400).json({ error: "ID flashcard không hợp lệ" });
       }
 
-      if (!word || !meaning || !example_sentence) {
+      if (!word || !meaning) {
         return res.status(400).json({
-          error: "word, meaning, và example_sentence là bắt buộc",
+          error: "word and meaning are required",
         });
       }
 

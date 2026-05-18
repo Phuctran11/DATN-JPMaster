@@ -3,10 +3,10 @@ import databaseService from "../services/database.service.js";
 export interface Flashcard {
   flashcard_id: number;
   user_id: number;
-  lesson_id: number | null;
+  lesson_id: number;
   word: string;
   meaning: string;
-  example_sentence: string;
+  example_sentence: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -16,8 +16,8 @@ export class FlashcardModel {
     userId: number,
     word: string,
     meaning: string,
-    exampleSentence: string,
-    lessonId?: number
+    lessonId: number,
+    exampleSentence?: string | null
   ): Promise<Flashcard> {
     const query = `
       INSERT INTO "Flashcard" (user_id, lesson_id, word, meaning, example_sentence, created_at, updated_at)
@@ -26,10 +26,10 @@ export class FlashcardModel {
     `;
     const result = await databaseService.executeQuery(query, [
       userId,
-      lessonId || null,
+      lessonId,
       word,
       meaning,
-      exampleSentence,
+      exampleSentence || null,
     ]);
     return result.rows[0];
   }
@@ -109,7 +109,7 @@ export class FlashcardModel {
     `;
     const result = await databaseService.executeQuery(query, [
       userId,
-      null,
+      originalFlashcard.lesson_id,
       originalFlashcard.word,
       originalFlashcard.meaning,
       originalFlashcard.example_sentence,
@@ -121,7 +121,7 @@ export class FlashcardModel {
     flashcardId: number,
     word: string,
     meaning: string,
-    exampleSentence: string
+    exampleSentence?: string | null
   ): Promise<Flashcard | null> {
     const query = `
       UPDATE "Flashcard"
@@ -129,7 +129,7 @@ export class FlashcardModel {
       WHERE flashcard_id = $4
       RETURNING flashcard_id, user_id, lesson_id, word, meaning, example_sentence, created_at, updated_at;
     `;
-    const result = await databaseService.executeQuery(query, [word, meaning, exampleSentence, flashcardId]);
+    const result = await databaseService.executeQuery(query, [word, meaning, exampleSentence || null, flashcardId]);
     return result.rows[0] || null;
   }
 

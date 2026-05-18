@@ -3,8 +3,20 @@ import { AuthenticatedRequest } from "../middlewares/auth.middleware.js";
 import enrollmentModel from "../models/enrollment.model.js";
 import purchaseModel from "../models/purchase.model.js";
 import courseModel from "../models/course.model.js";
+import quizModel from "../models/quiz.model.js";
 
 export class EnrollmentController {
+  private async getEffectiveEnrollmentStatus(
+    userId: number,
+    courseId: number,
+    status: 'active' | 'completed' | 'dropped'
+  ): Promise<'active' | 'completed' | 'dropped'> {
+    if (status !== "completed") return status;
+
+    const finalQuizPassed = await quizModel.hasPassedFinalQuiz(userId, courseId);
+    return finalQuizPassed ? "completed" : "active";
+  }
+
   /**
    * Get user's enrolled courses
    * Returns all enrollments regardless of status
@@ -33,10 +45,16 @@ export class EnrollmentController {
         enrollments.map(async (enrollment) => {
           const courseWithLessons = await courseModel.getCourseByIdWithLessons(enrollment.course_id);
           const progressSummary = await courseModel.getCourseProgressSummary(userId, enrollment.course_id);
+          const effectiveStatus = await this.getEffectiveEnrollmentStatus(userId, enrollment.course_id, enrollment.status);
+          const progressPercent =
+            progressSummary.progressPercent >= 100 && effectiveStatus !== "completed"
+              ? 99.99
+              : progressSummary.progressPercent;
           return {
             ...enrollment,
+            status: effectiveStatus,
             course: courseWithLessons,
-            progress_percent: progressSummary.progressPercent,
+            progress_percent: progressPercent,
             completed_lessons: progressSummary.completedLessons,
             total_lessons: progressSummary.totalLessons,
           };
@@ -95,19 +113,27 @@ export class EnrollmentController {
         enrollments.map(async (enrollment) => {
           const courseWithLessons = await courseModel.getCourseByIdWithLessons(enrollment.course_id);
           const progressSummary = await courseModel.getCourseProgressSummary(userId, enrollment.course_id);
+          const effectiveStatus = await this.getEffectiveEnrollmentStatus(userId, enrollment.course_id, enrollment.status);
+          const progressPercent =
+            progressSummary.progressPercent >= 100 && effectiveStatus !== "completed"
+              ? 99.99
+              : progressSummary.progressPercent;
           return {
             ...enrollment,
+            status: effectiveStatus,
             course: courseWithLessons,
-            progress_percent: progressSummary.progressPercent,
+            progress_percent: progressPercent,
             completed_lessons: progressSummary.completedLessons,
             total_lessons: progressSummary.totalLessons,
           };
         })
       );
 
+      const filteredCourses = coursesWithEnrollmentInfo.filter((enrollment) => enrollment.status === status);
+
       return res.status(200).json({
-        data: coursesWithEnrollmentInfo,
-        count: coursesWithEnrollmentInfo.length,
+        data: filteredCourses,
+        count: filteredCourses.length,
         status,
       });
     } catch (error) {
@@ -160,9 +186,7 @@ export class EnrollmentController {
         req.user.user_id,
         Number(course_id),
         finalPrice,
-        "completed",
-        undefined,
-        "standard"
+        "completed"
       );
 
       return res.status(201).json({
@@ -273,11 +297,14 @@ export class EnrollmentController {
 
       // Get enrollment record to include status
       const enrollment = await enrollmentModel.getEnrollmentByUserAndCourse(req.user.user_id, Number(courseId));
+      const effectiveStatus = enrollment
+        ? await this.getEffectiveEnrollmentStatus(req.user.user_id, Number(courseId), enrollment.status)
+        : "active";
 
       return res.status(200).json({
         data: {
           ...courseDetail,
-          enrollment_status: enrollment?.status || "active",
+          enrollment_status: effectiveStatus,
           enrollment_date: enrollment?.enrollment_date,
         },
       });
@@ -358,6 +385,71 @@ export class EnrollmentController {
       }
 
       return res.status(200).json({ data: lesson });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Mark a lesson as completed for the authenticated user
+   *
+   * @route PUT /api/enrollments/course/:courseId/lessons/:lessonId/complete
+   */
+  async markLessonCompleted(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { courseId, lessonId } = req.params;
+
+      if (!courseId || isNaN(Number(courseId)) || !lessonId || isNaN(Number(lessonId))) {
+        return res.status(400).json({ error: "Invalid course ID or lesson ID" });
+      }
+
+      const hasAccess = await enrollmentModel.checkUserCourseAccess(req.user.user_id, Number(courseId));
+      if (!hasAccess) {
+        return res.status(403).json({ error: "You are not enrolled in this course" });
+      }
+
+      const lesson = await courseModel.getLessonByCourseAndLessonId(Number(courseId), Number(lessonId));
+      if (!lesson) {
+        return res.status(404).json({ error: "Lesson not found" });
+      }
+
+      const lessonQuiz = await quizModel.getLessonQuiz(Number(lessonId), req.user.user_id);
+      const lessonQuizPassed = await quizModel.hasPassedLessonQuiz(req.user.user_id, Number(lessonId));
+      if (lessonQuiz && !lessonQuizPassed) {
+        return res.status(409).json({
+          error: "You must pass this lesson quiz before marking the lesson as completed",
+          data: { quiz: lessonQuiz },
+        });
+      }
+
+      const updated = await enrollmentModel.markLessonCompleted(req.user.user_id, Number(lessonId));
+      const progressSummary = await courseModel.getCourseProgressSummary(req.user.user_id, Number(courseId));
+      const courseCompleted = progressSummary.totalLessons > 0 && progressSummary.completedLessons === progressSummary.totalLessons;
+      const finalQuiz = await quizModel.getFinalQuiz(Number(courseId), req.user.user_id);
+      const finalQuizPassed = await quizModel.hasPassedFinalQuiz(req.user.user_id, Number(courseId));
+
+      if (courseCompleted && finalQuizPassed) {
+        await enrollmentModel.updateEnrollmentStatusByUserAndCourse(req.user.user_id, Number(courseId), "completed");
+      }
+
+      return res.status(200).json({
+        message: "Lesson marked as completed",
+        data: {
+          lesson_id: lesson.lesson_id,
+          completed: updated,
+          course_completed: courseCompleted && finalQuizPassed,
+          needs_final_quiz: courseCompleted && Boolean(finalQuiz) && !finalQuizPassed,
+          final_quiz: courseCompleted && finalQuiz && !finalQuizPassed ? finalQuiz : null,
+          enrollment_status: courseCompleted && finalQuizPassed ? "completed" : "active",
+          progress_percent: progressSummary.progressPercent,
+          completed_lessons: progressSummary.completedLessons,
+          total_lessons: progressSummary.totalLessons,
+        },
+      });
     } catch (error) {
       next(error);
     }

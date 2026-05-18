@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Header, Footer, Button, Card, Container, Breadcrumbs } from '../components';
 import { ImageCard } from '../components/ui';
 import { Heading, Text } from '../components/ui/Typography';
-import { courseAPI, enrollmentAPI, ratingAPI, type Course, type Lesson } from '../services/api';
+import { courseAPI, enrollmentAPI, quizAPI, ratingAPI, type Course, type Lesson, type Quiz } from '../services/api';
 import { RatingForm } from '../components/cards/RatingForm';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -14,7 +14,6 @@ interface CourseModule {
   id: number;
   title: string;
   videos: number;
-  duration: string;
 }
 
 function ModuleItem({
@@ -71,12 +70,12 @@ function ModuleItem({
                   <span className="material-symbols-outlined text-[16px]">{lesson.content_type === 'video' ? 'play_circle' : 'description'}</span>
                   {lesson.content_type}
                 </span>
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">schedule</span>
+                  {formatLessonDuration(lesson.duration)}
+                </span>
               </>
             )}
-            <span className="flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">timer</span>
-              {module.duration} Hours
-            </span>
           </div>
         </div>
       </div>
@@ -109,6 +108,35 @@ interface ReviewCard {
   rating: number;
   created_at: string;
 }
+
+const formatCourseDuration = (durationMinutes?: number | null) => {
+  if (durationMinutes == null || durationMinutes <= 0) {
+    return 'Self-paced';
+  }
+
+  const hours = Math.floor(durationMinutes / 60);
+  const minutes = durationMinutes % 60;
+
+  if (hours === 0) {
+    return `${durationMinutes} min`;
+  }
+
+  const hourLabel = hours === 1 ? 'hr' : 'hrs';
+
+  if (minutes === 0) {
+    return `${hours} ${hourLabel}`;
+  }
+
+  return `${hours} ${hourLabel} ${minutes} min`;
+};
+
+const formatLessonDuration = (durationMinutes?: number | null) => {
+  if (durationMinutes == null || durationMinutes <= 0) {
+    return 'Self-paced';
+  }
+
+  return durationMinutes < 60 ? `${durationMinutes} min` : formatCourseDuration(durationMinutes);
+};
 
 function ReviewItem({ review, isUser }: { review: ReviewCard; isUser?: boolean }) {
   const getInitials = (username: string | undefined) => (username || 'U').substring(0, 2).toUpperCase();
@@ -169,6 +197,7 @@ export default function CourseDetail() {
   const [enrolling, setEnrolling] = useState(false);
   const [enrollmentStatus, setEnrollmentStatus] = useState<'active' | 'completed' | 'dropped' | null>(null);
   const [userRating, setUserRating] = useState<ReviewCard | null>(null);
+  const [finalQuiz, setFinalQuiz] = useState<Quiz | null>(null);
 
   const fetchReviews = useCallback(async () => {
     if (!courseId) return;
@@ -221,9 +250,12 @@ export default function CourseDetail() {
             const enrollmentResult = await enrollmentAPI.getEnrolledCourseDetail(parseInt(courseId));
             setCourse(enrollmentResult.data);
             setEnrollmentStatus(enrollmentResult.data.enrollment_status as 'active' | 'completed' | 'dropped');
+            const finalQuizResult = await quizAPI.getFinalQuiz(parseInt(courseId));
+            setFinalQuiz(finalQuizResult.data);
           } catch (error) {
             // User is not enrolled (404 or error)
             setEnrollmentStatus(null);
+            setFinalQuiz(null);
           }
         }
       } catch (error) {
@@ -238,6 +270,10 @@ export default function CourseDetail() {
   }, [courseId, navigate, showToast, user, fetchReviews]);
 
   const firstUnfinishedLessonIndex = course?.lessons?.findIndex((lesson) => !lesson.is_completed) ?? -1;
+  const effectiveEnrollmentStatus = enrollmentStatus;
+  const allLessonsCompleted = Boolean(course?.lessons?.length) && firstUnfinishedLessonIndex === -1;
+  const finalQuizPassed = Boolean(finalQuiz?.has_passed || finalQuiz?.latest_attempt?.passed);
+  const shouldShowFinalTestButton = effectiveEnrollmentStatus === 'active' && allLessonsCompleted && finalQuiz && !finalQuizPassed;
 
   const handleEnroll = async () => {
     if (!user) {
@@ -265,6 +301,12 @@ export default function CourseDetail() {
 
     try {
       setEnrolling(true);
+      if (firstUnfinishedLessonIndex === -1 && course?.lessons?.length) {
+        const lastLesson = course.lessons[course.lessons.length - 1];
+        navigate(`/courses/${courseId}/lessons/${lastLesson.lesson_id}`);
+        return;
+      }
+
       const lessonResult = await enrollmentAPI.getNextLesson(parseInt(courseId));
       navigate(`/courses/${courseId}/lessons/${lessonResult.data.lesson_id}`);
     } catch (error) {
@@ -272,6 +314,16 @@ export default function CourseDetail() {
     } finally {
       setEnrolling(false);
     }
+  };
+
+  const handleViewCertificate = () => {
+    if (!courseId) return;
+    navigate(`/courses/${courseId}/certificate`);
+  };
+
+  const handleTakeFinalTest = () => {
+    if (!courseId) return;
+    navigate(`/courses/${courseId}/final-test`);
   };
 
   if (loading) {
@@ -302,8 +354,8 @@ export default function CourseDetail() {
   const breadcrumbs = [
     { label: 'Home', path: '/' },
     {
-      label: origin === '/courses' ? 'My Learning' : origin === '/explore' ? 'Explore Courses' : (enrollmentStatus === 'active' ? 'My Learning' : 'Explore Courses'),
-      path: origin === '/courses' ? '/courses' : origin === '/explore' ? '/explore' : (enrollmentStatus === 'active' ? '/courses' : '/explore'),
+      label: origin === '/courses' ? 'My Learning' : origin === '/explore' ? 'Explore Courses' : (effectiveEnrollmentStatus ? 'My Learning' : 'Explore Courses'),
+      path: origin === '/courses' ? '/courses' : origin === '/explore' ? '/explore' : (effectiveEnrollmentStatus ? '/courses' : '/explore'),
     },
     { label: course.title },
   ];
@@ -312,7 +364,6 @@ export default function CourseDetail() {
     id: index + 1,
     title: lesson.title,
     videos: 1,
-    duration: '2.5',
   }));
 
   return (
@@ -334,9 +385,8 @@ export default function CourseDetail() {
               <div className="md:col-span-7 flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-stack-md">
                   <span className="bg-primary-container text-white px-3 py-1 rounded-full text-[12px] font-bold tracking-widest uppercase">
-                    {course.is_free ? 'FREE COURSE' : 'PREMIUM COURSE'}
+                    {course.is_free ? 'FREE' : 'PAID'}
                   </span>
-                  <span className="text-primary font-semibold text-label-md">• Quality Learning</span>
                 </div>
                 <h1 className="font-display-lg text-display-lg text-primary mb-stack-md leading-tight">
                   {course.title}
@@ -349,6 +399,11 @@ export default function CourseDetail() {
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary">schedule</span>
                     <span className="text-body-md font-semibold">{getCourseLessonCount(course)} Lessons</span>
+                  </div>
+                  <div className="h-10 w-px bg-outline-variant"></div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">timer</span>
+                    <span className="text-body-md font-semibold">{formatCourseDuration(course.duration)}</span>
                   </div>
                   <div className="h-10 w-px bg-outline-variant"></div>
                   <div className="flex items-center gap-2">
@@ -373,14 +428,26 @@ export default function CourseDetail() {
                         </span>
                       </div>
                     </>
-                  ) : enrollmentStatus === 'active' ? (
-                    <Button onClick={handleGetStarted} variant="primary">
-                      Get Started
-                    </Button>
-                  ) : enrollmentStatus === 'completed' ? (
-                    <Button variant="secondary" disabled>
-                      ✓ Completed
-                    </Button>
+                  ) : effectiveEnrollmentStatus === 'active' ? (
+                    <>
+                      <Button onClick={shouldShowFinalTestButton ? handleTakeFinalTest : handleGetStarted} variant="primary">
+                        {shouldShowFinalTestButton ? 'Take Final Test' : 'Get Started'}
+                      </Button>
+                      {shouldShowFinalTestButton && (
+                        <span className="text-label-md font-semibold text-on-surface-variant">
+                          Final test required for certification
+                        </span>
+                      )}
+                    </>
+                  ) : effectiveEnrollmentStatus === 'completed' ? (
+                    <>
+                      <Button variant="secondary" disabled>
+                        ✓ Completed
+                      </Button>
+                      <Button onClick={handleViewCertificate} variant="primary">
+                        Certification
+                      </Button>
+                    </>
                   ) : (
                     <Button variant="secondary" disabled>
                       Dropped
@@ -426,6 +493,10 @@ export default function CourseDetail() {
                       </li>
                       <li className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
+                        {formatCourseDuration(course.duration)} Total Duration
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
                         {course.lessons?.filter(l => l.content_type === 'video').length || 0} Video Lessons
                       </li>
                       <li className="flex items-center gap-2">
@@ -442,19 +513,49 @@ export default function CourseDetail() {
               </div>
               <div className="md:col-span-8 space-y-stack-md">
                 {modules.length > 0 ? (
-                  modules.map((module, idx) => (
-                    <ModuleItem
-                      key={module.id}
-                      module={module}
-                      lesson={course.lessons?.[idx]}
-                      canPlay={Boolean(course.lessons?.[idx]?.is_completed || idx === firstUnfinishedLessonIndex)}
-                      onPlay={() => {
-                        const lessonId = course.lessons?.[idx]?.lesson_id;
-                        if (!lessonId || !courseId) return;
-                        navigate(`/courses/${courseId}/lessons/${lessonId}`);
-                      }}
-                    />
-                  ))
+                  <>
+                    {modules.map((module, idx) => (
+                      <ModuleItem
+                        key={module.id}
+                        module={module}
+                        lesson={course.lessons?.[idx]}
+                        canPlay={Boolean(course.lessons?.[idx]?.is_completed || idx === firstUnfinishedLessonIndex)}
+                        onPlay={() => {
+                          const lessonId = course.lessons?.[idx]?.lesson_id;
+                          if (!lessonId || !courseId) return;
+                          navigate(`/courses/${courseId}/lessons/${lessonId}`);
+                        }}
+                      />
+                    ))}
+                    {finalQuiz && enrollmentStatus && (
+                      <div className={`border p-stack-lg shadow-sm ${shouldShowFinalTestButton ? 'border-primary bg-primary-fixed/20' : finalQuizPassed ? 'border-emerald-300 bg-emerald-50' : 'border-outline-variant bg-surface-container-low'}`}>
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="text-label-md font-bold uppercase tracking-wide text-primary">Final test</p>
+                            <h3 className="mt-1 font-headline-sm text-on-surface">{finalQuiz.title}</h3>
+                            <p className="mt-1 text-label-md text-on-surface-variant">
+                              {finalQuizPassed
+                                ? finalQuiz.latest_attempt?.score != null
+                                  ? `Requirement satisfied. Latest score: ${Number(finalQuiz.latest_attempt.score).toFixed(2)}%.`
+                                  : 'Requirement satisfied.'
+                                : allLessonsCompleted
+                                  ? 'Complete this test to finish the course and unlock certification.'
+                                  : 'Unlocks after all lessons are completed.'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleTakeFinalTest}
+                            disabled={!allLessonsCompleted}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <span className="material-symbols-outlined">assignment</span>
+                            {finalQuizPassed ? 'Retake final' : 'Take final test'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <p className="text-on-surface-variant text-center py-8">No lessons yet</p>
                 )}
@@ -541,34 +642,6 @@ export default function CourseDetail() {
           </Container>
         </section>
 
-        {/* CTA Section */}
-        <section className="py-section-gap text-center bg-primary text-on-primary">
-          <Container>
-            <Heading level="h2" size="display-lg" className="text-on-primary mb-stack-md">
-              Ready to Start Learning?
-            </Heading>
-            <Text variant="body-lg" color="white" className="mb-stack-lg opacity-90">
-              {enrollmentStatus === null
-                ? `Join thousands of students in learning ${course.title}. Enroll now and start your journey.`
-                : enrollmentStatus === 'active'
-                ? `Continue your learning journey in ${course.title}.`
-                : `You have completed ${course.title}. Great job!`}
-            </Text>
-            {enrollmentStatus === null ? (
-              <Button variant="secondary" className="px-12 py-5" onClick={handleEnroll} disabled={enrolling}>
-                {enrolling ? 'Enrolling...' : 'Enroll in Course Today'}
-              </Button>
-            ) : enrollmentStatus === 'active' ? (
-              <Button variant="secondary" className="px-12 py-5" onClick={handleGetStarted}>
-                Get Started Learning
-              </Button>
-            ) : (
-              <Button variant="secondary" className="px-12 py-5" disabled>
-                ✓ Course Completed
-              </Button>
-            )}
-          </Container>
-        </section>
       </main>
       <Footer />
     </div>
