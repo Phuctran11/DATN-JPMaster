@@ -27,6 +27,15 @@ interface AuthResponse {
   token?: string;
 }
 
+export interface UserProfile {
+  user_id: number;
+  username: string;
+  email: string;
+  role: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Helper to get authorization header
 const getAuthHeader = (): { Authorization?: string } => {
   const token = localStorage.getItem('token');
@@ -101,6 +110,41 @@ export const authAPI = {
   },
 };
 
+export const userAPI = {
+  async getMe(): Promise<{ data: UserProfile }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/users/me`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch profile');
+    }
+
+    return response.json();
+  },
+
+  async updateMe(data: Pick<UserProfile, 'username' | 'email'>): Promise<{ message: string; data: UserProfile }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/users/me`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update profile');
+    }
+
+    return response.json();
+  },
+};
+
 // Course API endpoints
 export interface Course {
   course_id: number;
@@ -109,7 +153,10 @@ export interface Course {
   price: number;
   level?: string | null;
   is_free?: boolean;
+  duration?: number | null;
   created_by: number;
+  final_quiz_id?: number | null;
+  creator_username?: string;
   created_at: string;
   updated_at: string;
   lessons?: Lesson[];
@@ -119,10 +166,12 @@ export interface Lesson {
   lesson_id: number;
   course_id: number;
   title: string;
-  content_type: 'video' | 'text' | 'flashcard' | 'quiz';
+  content_type: 'video' | 'text' | 'quiz';
   content_text: string | null;
   video_url: string | null;
   order_index: number;
+  duration?: number | null;
+  created_by: number;
   created_at: string;
   updated_at: string;
   is_completed?: boolean;
@@ -135,6 +184,120 @@ export interface CourseRating {
   rating: number;
   review: string | null;
   created_at: string;
+}
+
+export interface QuizOption {
+  option_id: number;
+  question_id: number;
+  option_text: string;
+  explanation: string | null;
+}
+
+export interface QuizQuestion {
+  question_id: number;
+  question_text: string;
+  question_type: 'single_choice' | 'multiple_choice' | 'true_false' | 'fill_in_blank';
+  difficulty_level: string | null;
+  explanation: string | null;
+  points: number;
+  jlpt_level: string | null;
+  section_type: string | null;
+  order_index: number | null;
+  marks: number;
+  options: QuizOption[];
+}
+
+export interface QuizAttemptSummary {
+  attempt_id: number;
+  quiz_id: number;
+  score: number | null;
+  total_marks: number | null;
+  status: 'in_progress' | 'submitted' | 'graded';
+  started_at: string;
+  submitted_at: string | null;
+  passed: boolean;
+}
+
+export interface Quiz {
+  quiz_id: number;
+  lesson_id: number | null;
+  course_id: number | null;
+  title: string;
+  description: string | null;
+  quiz_type: 'lesson_quiz' | 'practice_test' | 'final_test' | 'jlpt_mock' | null;
+  passing_score: number;
+  total_marks: number;
+  time_limit_minutes: number | null;
+  questions: QuizQuestion[];
+  latest_attempt?: QuizAttemptSummary | null;
+  has_passed?: boolean;
+}
+
+export interface QuizAnswerPayload {
+  question_id: number;
+  option_id?: number;
+  option_ids?: number[];
+  answer_text?: string;
+}
+
+export interface QuizSubmitResult {
+  attempt_id: number;
+  quiz_id: number;
+  score: number;
+  total_marks: number;
+  earned_marks: number;
+  passing_score: number;
+  passed: boolean;
+  submitted_at: string;
+  question_results: Array<{
+    question_id: number;
+    is_correct: boolean;
+    explanation: string | null;
+    selected_option_ids: number[];
+    correct_option_ids: number[];
+    answer_text: string | null;
+  }>;
+}
+
+export type LessonNoteType = 'text_note' | 'video_note' | 'highlight' | 'question_note' | 'ai_summary';
+
+export interface LessonNote {
+  note_id: number;
+  user_id: number;
+  lesson_id: number | null;
+  question_id: number | null;
+  note_type: LessonNoteType;
+  note_content: string;
+  selected_text: string | null;
+  video_timestamp_seconds: number | null;
+  is_pinned: boolean;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  lesson_title?: string | null;
+  course_id?: number | null;
+  course_title?: string | null;
+  question_text?: string | null;
+}
+
+export interface CreateLessonNotePayload {
+  lesson_id?: number | null;
+  question_id?: number | null;
+  note_type: LessonNoteType;
+  note_content: string;
+  selected_text?: string | null;
+  video_timestamp_seconds?: number | null;
+  is_pinned?: boolean;
+}
+
+export interface LessonNoteFilters {
+  note_type?: LessonNoteType | 'all';
+  lesson_id?: number;
+  question_id?: number;
+  pinned?: boolean | 'all';
+  search?: string;
+  limit?: number;
+  offset?: number;
 }
 
 /**
@@ -160,7 +323,10 @@ export interface Course {
   price: number;
   level?: string | null;
   is_free?: boolean;
+  duration?: number | null;
   created_by: number;
+  final_quiz_id?: number | null;
+  creator_username?: string;
   created_at: string;
   updated_at: string;
   lessons?: Lesson[];
@@ -176,9 +342,7 @@ export interface Purchase {
   course_id: number;
   purchase_date: string;
   price_paid: number;
-  voucher_id?: number;
   status: 'pending' | 'completed' | 'canceled';
-  purchase_type: 'standard' | 'voucher';
 }
 
 export const courseAPI = {
@@ -244,6 +408,167 @@ export const purchaseAPI = {
       }
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch purchase');
+    }
+
+    return response.json();
+  },
+};
+
+export const quizAPI = {
+  async getLessonQuiz(lessonId: number): Promise<{ data: Quiz | null }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/quizzes/lessons/${lessonId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch lesson quiz');
+    }
+
+    return response.json();
+  },
+
+  async getFinalQuiz(courseId: number): Promise<{ data: Quiz | null }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/quizzes/courses/${courseId}/final`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch final quiz');
+    }
+
+    return response.json();
+  },
+
+  async startQuiz(quizId: number): Promise<{ data: QuizAttemptSummary }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/quizzes/${quizId}/start`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to start quiz');
+    }
+
+    return response.json();
+  },
+
+  async submitQuiz(quizId: number, answers: QuizAnswerPayload[], attemptId?: number): Promise<{ message: string; data: QuizSubmitResult }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/quizzes/${quizId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ answers, attempt_id: attemptId }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to submit quiz');
+    }
+
+    return response.json();
+  },
+};
+
+export const lessonNoteAPI = {
+  async getMyNotes(filters: LessonNoteFilters = {}): Promise<{ data: LessonNote[]; count: number }> {
+    const params = new URLSearchParams();
+    if (filters.note_type && filters.note_type !== 'all') params.set('note_type', filters.note_type);
+    if (filters.lesson_id) params.set('lesson_id', String(filters.lesson_id));
+    if (filters.question_id) params.set('question_id', String(filters.question_id));
+    if (filters.pinned !== undefined && filters.pinned !== 'all') params.set('pinned', String(filters.pinned));
+    if (filters.search?.trim()) params.set('search', filters.search.trim());
+    params.set('limit', String(filters.limit ?? 20));
+    params.set('offset', String(filters.offset ?? 0));
+
+    const response = await authenticatedFetch(`${API_BASE_URL}/lesson-notes?${params}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch notes');
+    }
+
+    return response.json();
+  },
+
+  async createNote(payload: CreateLessonNotePayload): Promise<{ message: string; data: LessonNote }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/lesson-notes`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create note');
+    }
+
+    return response.json();
+  },
+
+  async updateNote(noteId: number, payload: Partial<CreateLessonNotePayload>): Promise<{ message: string; data: LessonNote }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/lesson-notes/${noteId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update note');
+    }
+
+    return response.json();
+  },
+
+  async setPinned(noteId: number, isPinned: boolean): Promise<{ message: string; data: LessonNote }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/lesson-notes/${noteId}/pin`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_pinned: isPinned }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update pinned note');
+    }
+
+    return response.json();
+  },
+
+  async deleteNote(noteId: number): Promise<{ message: string }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/lesson-notes/${noteId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete note');
     }
 
     return response.json();
@@ -407,6 +732,41 @@ export const enrollmentAPI = {
       }
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch next lesson');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Mark a lesson as completed
+   */
+  async markLessonCompleted(
+    courseId: number,
+    lessonId: number
+  ): Promise<{
+    message: string;
+    data: {
+      lesson_id: number;
+      completed: boolean;
+      course_completed?: boolean;
+      needs_final_quiz?: boolean;
+      final_quiz?: Quiz | null;
+      enrollment_status?: 'active' | 'completed' | 'dropped';
+      progress_percent?: number;
+      completed_lessons?: number;
+      total_lessons?: number;
+    };
+  }> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/enrollments/course/${courseId}/lessons/${lessonId}/complete`, {
+      method: 'PUT',
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please login first');
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to mark lesson as completed');
     }
 
     return response.json();

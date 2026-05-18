@@ -32,6 +32,19 @@ export function MobileMenu({ navLinks, isActive, onClose }: MobileMenuProps) {
             {link.label}
           </Link>
         ))}
+        {user && (
+          <Link
+            to="/profile"
+            onClick={onClose}
+            className={`px-margin-mobile py-3 text-label-md font-inter transition-all duration-200 border-b border-outline-variant/30 ${
+              isActive('/profile')
+                ? 'text-primary font-bold bg-primary/10 border-l-4 border-l-primary'
+                : 'text-on-surface-variant hover:text-primary hover:bg-primary/5'
+            }`}
+          >
+            Profile
+          </Link>
+        )}
         {!user && (
           <>
             <Link

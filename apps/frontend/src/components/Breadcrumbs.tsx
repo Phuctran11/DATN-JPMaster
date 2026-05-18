@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Container } from './index';
 
 export interface BreadcrumbItem {
@@ -12,9 +13,38 @@ interface BreadcrumbsProps {
 
 export function Breadcrumbs({ items }: BreadcrumbsProps) {
   const navigate = useNavigate();
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const header = document.querySelector('[data-app-header]');
+    if (!(header instanceof HTMLElement)) return;
+
+    const updateHeaderHeight = () => {
+      setHeaderHeight(header.offsetHeight);
+    };
+
+    updateHeaderHeight();
+
+    const resizeObserver = new ResizeObserver(updateHeaderHeight);
+    resizeObserver.observe(header);
+    window.addEventListener('resize', updateHeaderHeight);
+    window.addEventListener('orientationchange', updateHeaderHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateHeaderHeight);
+      window.removeEventListener('orientationchange', updateHeaderHeight);
+    };
+  }, []);
 
   return (
-    <nav className="bg-surface py-3 border-b border-outline-variant" aria-label="Breadcrumb">
+    <nav
+      className="sticky z-40 bg-surface/95 py-3 border-b border-outline-variant backdrop-blur-md"
+      style={{ top: `${headerHeight}px` }}
+      aria-label="Breadcrumb"
+    >
       <Container>
         <div className="flex items-center gap-2 text-label-sm text-on-surface-variant">
           {items.map((item, index) => (

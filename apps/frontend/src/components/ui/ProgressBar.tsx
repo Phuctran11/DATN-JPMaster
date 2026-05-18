@@ -25,12 +25,13 @@ export function ProgressBar({
   };
 
   const clampedValue = Math.min(Math.max(value, 0), 100);
+  const displayValue = Number.isInteger(clampedValue) ? clampedValue : clampedValue.toFixed(2);
 
   return (
     <div className={className}>
       {showLabel && (
         <div className="flex items-center justify-between mb-2">
-          <span className="text-label-md text-outline">{clampedValue}% Complete</span>
+          <span className="text-label-md text-outline">{displayValue}% Complete</span>
         </div>
       )}
       <div className={`w-full ${sizeClasses[size]} bg-surface-container-high rounded-full overflow-hidden`}>

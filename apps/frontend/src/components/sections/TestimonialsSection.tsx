@@ -9,6 +9,7 @@ interface Review {
   course_id: number;
   course_title: string;
   average_rating: number;
+  rating_count?: number;
   user_id: number;
   username: string;
   rating: number;
@@ -96,8 +97,18 @@ export function TestimonialsSection() {
     navigate(`/courses/${courseId}`);
   };
 
-  const largeReview = reviews[0];
-  const smallReviews = reviews.slice(1);
+  const sortedReviews = [...reviews].sort((a, b) => {
+    const ratingDiff = b.average_rating - a.average_rating;
+    if (ratingDiff !== 0) return ratingDiff;
+
+    const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (dateDiff !== 0) return dateDiff;
+
+    return (b.rating_count || 0) - (a.rating_count || 0);
+  });
+
+  const largeReview = sortedReviews[0];
+  const smallReviews = sortedReviews.slice(1);
 
   return (
     <Section bgColor="light">

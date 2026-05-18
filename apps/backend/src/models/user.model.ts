@@ -58,6 +58,17 @@ export class UserModel {
     return result.rows[0] || null;
   }
 
+  async updateUserProfile(userId: number, username: string, email: string): Promise<User | null> {
+    const query = `
+      UPDATE "User"
+      SET username = $1, email = $2, updated_at = NOW()
+      WHERE user_id = $3
+      RETURNING user_id, username, email, password_hash, role, created_at, updated_at;
+    `;
+    const result = await databaseService.executeQuery(query, [username, email, userId]);
+    return result.rows[0] || null;
+  }
+
   async deleteUser(userId: number): Promise<boolean> {
     const query = `DELETE FROM "User" WHERE user_id = $1;`;
     const result = await databaseService.executeQuery(query, [userId]);

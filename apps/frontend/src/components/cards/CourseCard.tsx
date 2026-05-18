@@ -1,7 +1,15 @@
 import { Card, ImageCard, ProgressBar } from '../ui';
 import { Heading, Text } from '../ui/Typography';
 import { Icon } from '../ui';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type RefObject,
+} from 'react';
 
 function CourseTypeBadge({ isFree = false }: { isFree?: boolean }) {
   const badgeTheme = isFree
@@ -28,17 +36,219 @@ function triggerEnroll(
   if (typeof courseId === 'number') onEnroll?.(courseId);
 }
 
+const formatCourseDate = (value?: string) => {
+  if (!value) return 'Unknown';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown';
+
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const formatCourseDuration = (durationMinutes?: number | null) => {
+  if (durationMinutes == null || durationMinutes <= 0) return 'Flexible';
+
+  const hours = Math.floor(durationMinutes / 60);
+  const minutes = durationMinutes % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+};
+
+interface CourseMetaProps {
+  averageRating?: number;
+  ratingCount?: number;
+  createdBy?: string;
+  createdAt?: string;
+  duration?: number | null;
+}
+
+type CourseHoverPlacement = 'top' | 'bottom';
+
+interface CourseHoverStyle {
+  left: number;
+  top: number;
+  arrowLeft: number;
+  placement: CourseHoverPlacement;
+}
+
+const HOVER_CARD_GAP = 18;
+const HOVER_CARD_VIEWPORT_MARGIN = 16;
+
+function CourseHoverInfo({
+  averageRating,
+  ratingCount,
+  createdBy,
+  createdAt,
+  duration,
+  visible,
+  hoverStyle,
+  cardRef,
+}: CourseMetaProps & {
+  visible: boolean;
+  hoverStyle: CourseHoverStyle | null;
+  cardRef: RefObject<HTMLDivElement | null>;
+}) {
+  const ratingLabel = typeof averageRating === 'number' && averageRating > 0
+    ? `${averageRating.toFixed(1)} (${ratingCount || 0})`
+    : 'No ratings';
+
+  const items = [
+    { icon: 'star', label: 'Rating', value: ratingLabel, highlight: true },
+    { icon: 'person', label: 'Created by', value: createdBy || 'Instructor' },
+    { icon: 'calendar_today', label: 'Created in', value: formatCourseDate(createdAt) },
+    { icon: 'schedule', label: 'Duration', value: formatCourseDuration(duration) },
+  ];
+
+  return (
+    <div
+      ref={cardRef}
+      style={hoverStyle ? { left: hoverStyle.left, top: hoverStyle.top } : undefined}
+      className={`pointer-events-none fixed z-[80] w-[min(92vw,21rem)] rounded-[1.75rem] border border-primary/20 bg-white/95 p-4 text-on-surface shadow-2xl shadow-primary/20 backdrop-blur-md transition-[opacity,transform] duration-200 sm:w-80 ${
+        visible && hoverStyle ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+      }`}
+    >
+      {hoverStyle && (
+        <>
+          <span
+            style={{ left: hoverStyle.arrowLeft }}
+            className={`absolute h-4 w-4 -translate-x-1/2 rotate-45 border-primary/20 bg-white/95 ${
+              hoverStyle.placement === 'top'
+                ? 'top-full -translate-y-2 border-b border-r'
+                : 'bottom-full translate-y-2 border-l border-t'
+            }`}
+          ></span>
+          <span
+            style={{ left: hoverStyle.arrowLeft + 20 }}
+            className={`absolute h-3 w-3 rounded-full border border-primary/15 bg-white/95 shadow-lg ${
+              hoverStyle.placement === 'top' ? 'top-[calc(100%+0.6rem)]' : 'bottom-[calc(100%+0.6rem)]'
+            }`}
+          ></span>
+          <span
+            style={{ left: hoverStyle.arrowLeft + 36 }}
+            className={`absolute h-2 w-2 rounded-full border border-primary/10 bg-white/90 shadow-md ${
+              hoverStyle.placement === 'top' ? 'top-[calc(100%+1.45rem)]' : 'bottom-[calc(100%+1.45rem)]'
+            }`}
+          ></span>
+        </>
+      )}
+      <div className="mb-3 flex items-center justify-between gap-3 border-b border-primary/15 pb-3">
+        <span className="text-[11px] font-black uppercase tracking-[0.16em] text-secondary">Course info</span>
+        <span className="rounded-full bg-secondary px-3 py-1 text-[11px] font-black uppercase tracking-wide text-on-secondary">
+          Details
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-xl border p-3 ${item.highlight ? 'border-secondary/40 bg-secondary/10' : 'border-outline-variant/40 bg-surface/80'}`}
+          >
+            <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
+              <span className="material-symbols-outlined text-[15px]">{item.icon}</span>
+              {item.label}
+            </div>
+            <p className="truncate text-label-md font-black text-on-surface">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function useCourseHoverPosition() {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [hoverStyle, setHoverStyle] = useState<CourseHoverStyle | null>(null);
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const card = cardRef.current;
+    if (!trigger || !card) return;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    const cardWidth = cardRect.width || Math.min(window.innerWidth * 0.92, 336);
+    const cardHeight = cardRect.height || 180;
+    const centerX = triggerRect.left + triggerRect.width / 2;
+    const left = Math.min(
+      Math.max(centerX - cardWidth / 2, HOVER_CARD_VIEWPORT_MARGIN),
+      window.innerWidth - cardWidth - HOVER_CARD_VIEWPORT_MARGIN,
+    );
+    const topSpace = triggerRect.top;
+    const bottomSpace = window.innerHeight - triggerRect.bottom;
+    const placement: CourseHoverPlacement =
+      topSpace < cardHeight + HOVER_CARD_GAP && bottomSpace > topSpace ? 'bottom' : 'top';
+    const top = placement === 'top'
+      ? Math.max(HOVER_CARD_VIEWPORT_MARGIN, triggerRect.top - cardHeight - HOVER_CARD_GAP)
+      : Math.min(window.innerHeight - cardHeight - HOVER_CARD_VIEWPORT_MARGIN, triggerRect.bottom + HOVER_CARD_GAP);
+    const arrowLeft = Math.min(Math.max(centerX - left, 28), cardWidth - 28);
+
+    setHoverStyle({ left, top, arrowLeft, placement });
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [updatePosition, visible]);
+
+  const showHoverCard = () => {
+    setVisible(true);
+    window.requestAnimationFrame(updatePosition);
+  };
+
+  const hideHoverCard = () => {
+    setVisible(false);
+  };
+
+  return {
+    triggerRef,
+    cardRef,
+    hoverStyle,
+    visible,
+    showHoverCard,
+    hideHoverCard,
+  };
+}
+
 interface MyLearningCardProps {
   courseId: number;
   title: string;
   progress: number;
   status: 'In Progress' | 'Completed' | 'Not Started';
   image: string;
+  needsFinalTest?: boolean;
   onClick?: (courseId: number) => void;
   onGetStarted?: (courseId: number) => void;
+  onTakeFinalTest?: (courseId: number) => void;
+  onViewCertificate?: (courseId: number) => void;
 }
 
-export function MyLearningCard({ courseId, title, progress, status, image, onClick, onGetStarted }: MyLearningCardProps) {
+export function MyLearningCard({
+  courseId,
+  title,
+  progress,
+  status,
+  image,
+  needsFinalTest = false,
+  onClick,
+  onGetStarted,
+  onTakeFinalTest,
+  onViewCertificate,
+}: MyLearningCardProps) {
   const handleClick = () => {
     onClick?.(courseId);
   };
@@ -46,6 +256,16 @@ export function MyLearningCard({ courseId, title, progress, status, image, onCli
   const handleGetStarted = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onGetStarted?.(courseId);
+  };
+
+  const handleTakeFinalTest = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onTakeFinalTest?.(courseId);
+  };
+
+  const handleViewCertificate = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onViewCertificate?.(courseId);
   };
 
   return (
@@ -73,23 +293,46 @@ export function MyLearningCard({ courseId, title, progress, status, image, onCli
           <ProgressBar value={progress} showLabel variant="default" />
         </div>
       </div>
-      <div className="shrink-0 flex items-center">
+      <div className="shrink-0 flex flex-col items-stretch gap-2 sm:items-end">
         {status === 'In Progress' ? (
-          <button
-            type="button"
-            onClick={handleGetStarted}
-            className="whitespace-nowrap rounded-full bg-primary px-4 py-2 text-label-md font-semibold text-on-primary transition-colors hover:bg-primary-container hover:text-on-primary"
-          >
-            Get Started
-          </button>
+          needsFinalTest ? (
+            <button
+              type="button"
+              onClick={handleTakeFinalTest}
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border-2 border-secondary bg-secondary px-4 py-2 text-label-md font-black text-on-secondary shadow-md transition-colors hover:bg-secondary-container hover:text-on-secondary-container"
+            >
+              <span className="material-symbols-outlined text-[18px]">assignment</span>
+              Take Final Test
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleGetStarted}
+              className="whitespace-nowrap rounded-full bg-primary px-4 py-2 text-label-md font-semibold text-on-primary transition-colors hover:bg-primary-container hover:text-on-primary"
+            >
+              Get Started
+            </button>
+          )
         ) : (
-          <button
-            type="button"
-            disabled
-            className="whitespace-nowrap rounded-full bg-surface-container px-4 py-2 text-label-md font-semibold text-on-surface-variant"
-          >
-            {status === 'Completed' ? 'Completed' : 'Not Started'}
-          </button>
+          <>
+            <button
+              type="button"
+              disabled
+              className="whitespace-nowrap rounded-full bg-surface-container px-4 py-2 text-label-md font-semibold text-on-surface-variant"
+            >
+              {status === 'Completed' ? 'Completed' : 'Not Started'}
+            </button>
+            {status === 'Completed' && (
+              <button
+                type="button"
+                onClick={handleViewCertificate}
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-secondary px-4 py-2 text-label-md font-bold text-on-secondary shadow-md transition-colors hover:bg-secondary-container hover:text-on-secondary-container"
+              >
+                <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
+                Certification
+              </button>
+            )}
+          </>
         )}
       </div>
     </Card>
@@ -104,11 +347,49 @@ interface CourseGridCardProps {
   isFree?: boolean;
   courseId?: number;
   onEnroll?: (courseId: number) => void;
+  averageRating?: number;
+  ratingCount?: number;
+  createdBy?: string;
+  createdAt?: string;
+  duration?: number | null;
 }
 
-export function CourseGridCard({ title, description, price, image, isFree, courseId, onEnroll }: CourseGridCardProps) {
+export function CourseGridCard({
+  title,
+  description,
+  price,
+  image,
+  isFree,
+  courseId,
+  onEnroll,
+  averageRating,
+  ratingCount,
+  createdBy,
+  createdAt,
+  duration,
+}: CourseGridCardProps) {
+  const hover = useCourseHoverPosition();
+
   return (
-    <Card className="flex flex-col group relative overflow-hidden border-2 border-outline-variant hover:border-primary transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-2 bg-surface-container-high">
+    <div
+      ref={hover.triggerRef}
+      className="group relative overflow-visible"
+      onMouseEnter={hover.showHoverCard}
+      onMouseLeave={hover.hideHoverCard}
+      onFocus={hover.showHoverCard}
+      onBlur={hover.hideHoverCard}
+    >
+      <CourseHoverInfo
+        averageRating={averageRating}
+        ratingCount={ratingCount}
+        createdBy={createdBy}
+        createdAt={createdAt}
+        duration={duration}
+        visible={hover.visible}
+        hoverStyle={hover.hoverStyle}
+        cardRef={hover.cardRef}
+      />
+      <Card className="flex flex-col relative overflow-hidden border-2 border-outline-variant hover:border-primary transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-2 bg-surface-container-high">
       <div className="relative overflow-hidden">
         <ImageCard
           src={image}
@@ -134,14 +415,17 @@ export function CourseGridCard({ title, description, price, image, isFree, cours
           <span className="font-headline-sm text-primary text-title-lg font-bold">{price}₫</span>
           <button
             type="button"
+            aria-label={`View ${title}`}
+            title="View course"
             onClick={(event) => triggerEnroll(event, courseId, onEnroll)}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-label-md font-black uppercase tracking-wider text-on-primary shadow-md transition-all duration-200 hover:bg-primary-container hover:text-on-primary hover:shadow-lg"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-on-primary shadow-md transition-all duration-200 hover:bg-primary-container hover:text-on-primary hover:shadow-lg"
           >
-            Enroll
+            <Icon name="arrow_forward" size="md" />
           </button>
         </div>
       </div>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
@@ -154,6 +438,11 @@ interface FeaturedCourseCardProps {
   courseId: number;
   onEnroll?: (courseId: number) => void;
   lessonCount?: number;
+  averageRating?: number;
+  ratingCount?: number;
+  createdBy?: string;
+  createdAt?: string;
+  duration?: number | null;
 }
 
 export function FeaturedCourseCard({
@@ -165,15 +454,40 @@ export function FeaturedCourseCard({
   courseId,
   onEnroll,
   lessonCount,
+  averageRating,
+  ratingCount,
+  createdBy,
+  createdAt,
+  duration,
 }: FeaturedCourseCardProps) {
+  const hover = useCourseHoverPosition();
+
   return (
-    <div className="lg:col-span-2 relative group overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary-container text-on-primary shadow-2xl border-3 border-secondary hover:border-secondary-fixed transition-all duration-300 hover:shadow-3xl">
-      <div className="absolute inset-0 opacity-10 pointer-events-none">
-        <Icon name="verified_user" size="lg" />
-      </div>
-      <div className="absolute -right-24 -top-24 w-96 h-96 bg-secondary/15 rounded-full blur-3xl group-hover:blur-2xl transition-all"></div>
-      <div className="absolute -left-12 -bottom-12 w-80 h-80 bg-secondary-container/15 rounded-full blur-3xl group-hover:blur-2xl transition-all"></div>
-      <div className="relative flex flex-col lg:flex-row h-full z-10">
+    <div
+      ref={hover.triggerRef}
+      className="lg:col-span-2 group relative overflow-visible"
+      onMouseEnter={hover.showHoverCard}
+      onMouseLeave={hover.hideHoverCard}
+      onFocus={hover.showHoverCard}
+      onBlur={hover.hideHoverCard}
+    >
+      <CourseHoverInfo
+        averageRating={averageRating}
+        ratingCount={ratingCount}
+        createdBy={createdBy}
+        createdAt={createdAt}
+        duration={duration}
+        visible={hover.visible}
+        hoverStyle={hover.hoverStyle}
+        cardRef={hover.cardRef}
+      />
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary-container text-on-primary shadow-2xl border-3 border-secondary hover:border-secondary-fixed transition-all duration-300 hover:shadow-3xl">
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <Icon name="verified_user" size="lg" />
+        </div>
+        <div className="absolute -right-24 -top-24 w-96 h-96 bg-secondary/15 rounded-full blur-3xl group-hover:blur-2xl transition-all"></div>
+        <div className="absolute -left-12 -bottom-12 w-80 h-80 bg-secondary-container/15 rounded-full blur-3xl group-hover:blur-2xl transition-all"></div>
+        <div className="relative flex flex-col lg:flex-row h-full z-10">
         <div className="lg:w-1/2 relative group/img min-h-[320px] lg:min-h-full overflow-hidden">
           <ImageCard
             src={image}
@@ -210,10 +524,12 @@ export function FeaturedCourseCard({
             <div className="flex items-center">
               <button
                 type="button"
+                aria-label={`View ${title}`}
+                title="View course"
                 onClick={(event) => triggerEnroll(event, courseId, onEnroll)}
-                className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 bg-white/10 px-5 py-3 text-label-md font-black uppercase tracking-wider text-white backdrop-blur-sm transition-all hover:bg-white hover:text-primary"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/30 bg-white/10 text-white backdrop-blur-sm transition-all hover:bg-white hover:text-primary"
               >
-                Enroll
+                <Icon name="arrow_forward" size="lg" />
               </button>
             </div>
           </div>
@@ -225,6 +541,7 @@ export function FeaturedCourseCard({
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

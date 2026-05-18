@@ -81,7 +81,9 @@ export class CourseEnrollmentModel {
     const query = `
       SELECT 1
       FROM "CourseEnrollment"
-      WHERE user_id = $1 AND course_id = $2
+      WHERE user_id = $1
+        AND course_id = $2
+        AND status IN ('active', 'completed')
       LIMIT 1;
     `;
 
@@ -113,6 +115,10 @@ export class CourseEnrollmentModel {
     const query = `
       INSERT INTO "CourseEnrollment" (user_id, course_id, enrollment_date, status)
       VALUES ($1, $2, NOW(), $3)
+      ON CONFLICT (user_id, course_id)
+      DO UPDATE SET
+        enrollment_date = NOW(),
+        status = EXCLUDED.status
       RETURNING enrollment_id, user_id, course_id, enrollment_date, status;
     `;
 
@@ -125,9 +131,6 @@ export class CourseEnrollmentModel {
 
       return formatEnrollment(result.rows[0]);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('duplicate key')) {
-        throw new Error(`User ${userId} is already enrolled in course ${courseId}`);
-      }
       throw new Error(
         `Failed to enroll user ${userId} in course ${courseId}: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -164,6 +167,28 @@ export class CourseEnrollmentModel {
     }
   }
 
+  async updateEnrollmentStatusByUserAndCourse(
+    userId: number,
+    courseId: number,
+    status: 'active' | 'completed' | 'dropped'
+  ): Promise<CourseEnrollment | null> {
+    const query = `
+      UPDATE "CourseEnrollment"
+      SET status = $1
+      WHERE user_id = $2 AND course_id = $3
+      RETURNING enrollment_id, user_id, course_id, enrollment_date, status;
+    `;
+
+    try {
+      const result = await databaseService.executeQuery(query, [status, userId, courseId]);
+      return result.rows[0] ? formatEnrollment(result.rows[0]) : null;
+    } catch (error) {
+      throw new Error(
+        `Failed to update enrollment status for user ${userId}, course ${courseId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
   /**
    * Get specific enrollment by ID
    *
@@ -189,15 +214,20 @@ export class CourseEnrollmentModel {
   }
 
   /**
-   * Delete enrollment record
-   * Removes user's access to course
+   * Drop enrollment record.
+   * Keeps the row so CourseRating's composite foreign key remains valid.
    *
    * @param enrollmentId - Enrollment ID to delete
    * @returns true if deletion successful, false if enrollment not found
    * @throws Error if database fails
    */
   async deleteEnrollment(enrollmentId: number): Promise<boolean> {
-    const query = `DELETE FROM "CourseEnrollment" WHERE enrollment_id = $1;`;
+    const query = `
+      UPDATE "CourseEnrollment"
+      SET status = 'dropped'
+      WHERE enrollment_id = $1
+      RETURNING enrollment_id;
+    `;
 
     try {
       const result = await databaseService.executeQuery(query, [enrollmentId]);
@@ -273,6 +303,43 @@ export class CourseEnrollmentModel {
     } catch (error) {
       throw new Error(
         `Failed to fetch enrollment for user ${userId}, course ${courseId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Mark a lesson as completed for a user
+   * Creates or updates the lesson progress row for the given lesson
+   */
+  async markLessonCompleted(userId: number, lessonId: number): Promise<boolean> {
+    const query = `
+      INSERT INTO "UserLessonProgress" (
+        user_id,
+        lesson_id,
+        started_at,
+        completed_at,
+        video_watched_percent,
+        completed,
+        last_updated,
+        status
+      )
+      VALUES ($1, $2, NOW(), NOW(), 100, TRUE, NOW(), 'completed')
+      ON CONFLICT (user_id, lesson_id)
+      DO UPDATE SET
+        completed = TRUE,
+        completed_at = NOW(),
+        video_watched_percent = 100,
+        last_updated = NOW(),
+        status = 'completed'
+      RETURNING user_lesson_progress_id;
+    `;
+
+    try {
+      const result = await databaseService.executeQuery(query, [userId, lessonId]);
+      return result.rows.length > 0;
+    } catch (error) {
+      throw new Error(
+        `Failed to mark lesson ${lessonId} as completed for user ${userId}: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

@@ -254,6 +254,11 @@ export default function CourseExplore() {
                         image={courseImage}
                         courseId={filteredCourses[0].course_id}
                         onEnroll={handleCourseClick}
+                        averageRating={filteredCourses[0].average_rating}
+                        ratingCount={filteredCourses[0].rating_count}
+                        createdBy={filteredCourses[0].creator_username || `Creator #${filteredCourses[0].created_by}`}
+                        createdAt={filteredCourses[0].created_at}
+                        duration={filteredCourses[0].duration}
                       />
                     ) : null}
 
@@ -272,6 +277,11 @@ export default function CourseExplore() {
                             isFree={Number(course.price) === 0}
                             courseId={course.course_id}
                             onEnroll={handleCourseClick}
+                            averageRating={course.average_rating}
+                            ratingCount={course.rating_count}
+                            createdBy={course.creator_username || `Creator #${course.created_by}`}
+                            createdAt={course.created_at}
+                            duration={course.duration}
                           />
                         </div>
                       ))}

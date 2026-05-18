@@ -79,6 +79,11 @@ export function FeaturedCoursesSection() {
             courseId={featured.course_id}
             onEnroll={handleCourseClick}
             lessonCount={getCourseLessonCount(featured)}
+            averageRating={featured.average_rating}
+            ratingCount={featured.rating_count}
+            createdBy={featured.creator_username || `Creator #${featured.created_by}`}
+            createdAt={featured.created_at}
+            duration={featured.duration}
           />
         ) : null}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -92,6 +97,11 @@ export function FeaturedCoursesSection() {
                 isFree={Number(course.price) === 0}
                 courseId={course.course_id}
                 onEnroll={handleCourseClick}
+                averageRating={course.average_rating}
+                ratingCount={course.rating_count}
+                createdBy={course.creator_username || `Creator #${course.created_by}`}
+                createdAt={course.created_at}
+                duration={course.duration}
               />
             </div>
           ))}
