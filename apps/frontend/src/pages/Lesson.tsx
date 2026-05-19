@@ -26,7 +26,7 @@ export default function Lesson() {
   const [quizLoading, setQuizLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [highlightText, setHighlightText] = useState<string | null>(null);
-  const [videoNoteTimestamp, setVideoNoteTimestamp] = useState<number | null | undefined>(undefined);
+  const [videoNoteDraft, setVideoNoteDraft] = useState<{ timestamp: number | null; note: LessonNote | null } | null>(null);
   const [lessonNotes, setLessonNotes] = useState<LessonNote[]>([]);
 
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -160,13 +160,10 @@ export default function Lesson() {
   const lessonQuizPassed = !lessonQuiz || Boolean(lessonQuiz.has_passed || lessonQuiz.latest_attempt?.passed);
   const textNote = lessonNotes.find((note) => note.note_type === 'text_note') ?? null;
   const videoNotes = lessonNotes.filter((note) => note.note_type === 'video_note');
+  const highlightNotes = lessonNotes.filter((note) => note.note_type === 'highlight' && note.selected_text?.trim());
   const activeHighlightNote = highlightText
     ? lessonNotes.find((note) => note.note_type === 'highlight' && note.selected_text === highlightText) ?? null
     : null;
-  const activeVideoNote = videoNoteTimestamp !== undefined
-    ? lessonNotes.find((note) => note.note_type === 'video_note' && note.video_timestamp_seconds === videoNoteTimestamp) ?? null
-    : null;
-
   const handleNoteSaved = useCallback((savedNote: LessonNote) => {
     setLessonNotes((previous) => {
       const exists = previous.some((note) => note.note_id === savedNote.note_id);
@@ -175,6 +172,19 @@ export default function Lesson() {
         : [savedNote, ...previous];
     });
   }, []);
+
+  const handleNoteDeleted = useCallback((noteId: number) => {
+    setLessonNotes((previous) => previous.filter((note) => note.note_id !== noteId));
+  }, []);
+
+  const handleAddVideoNote = useCallback(
+    (timestamp: number | null) => {
+      const normalizedTimestamp = Math.max(0, Math.floor(timestamp ?? 0));
+      const existingNote = videoNotes.find((note) => note.video_timestamp_seconds === normalizedTimestamp) ?? null;
+      setVideoNoteDraft({ timestamp: normalizedTimestamp, note: existingNote });
+    },
+    [videoNotes]
+  );
 
   useEffect(() => {
     if (!courseId || !currentLesson) {
@@ -333,6 +343,7 @@ export default function Lesson() {
           sectionRef={sectionRef}
           onBackToCourse={() => navigate(`/courses/${courseId}`)}
           onToggleSidebar={() => setIsSidebarOpen((previous) => !previous)}
+          onToggleStudyMode={handleToggleStudyMode}
         />
       )}
 
@@ -354,62 +365,70 @@ export default function Lesson() {
           ref={lessonMainRef}
           className={
             isStudyMode
-              ? 'fixed inset-0 z-[60] overflow-y-auto bg-surface-container-low py-6 transition-all duration-300 md:py-8'
+              ? 'fixed inset-0 z-[60] overflow-y-auto bg-surface-container-low transition-all duration-300'
               : `flex-1 bg-surface-container-low py-10 transition-all duration-300 md:py-12 ${isSidebarOpen ? 'md:ml-80' : 'md:ml-16'}`
           }
         >
-          <Container className={isStudyMode ? 'h-full max-w-none px-margin-mobile md:px-margin-desktop' : ''}>
+          {isStudyMode && (
+            <div className="sticky top-0 z-20 border-b border-outline-variant bg-white/95 backdrop-blur">
+              <Container className="max-w-none px-margin-mobile py-3 md:px-margin-desktop">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-label-md font-bold uppercase tracking-wide text-primary">Study mode</p>
+                    <h1 className="truncate text-title-lg font-bold text-on-surface">{currentLesson.title}</h1>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleStudyMode}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-outline-variant bg-white px-4 py-2 font-bold text-on-surface hover:border-primary hover:text-primary"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">visibility_off</span>
+                    Exit study mode
+                  </button>
+                </div>
+              </Container>
+            </div>
+          )}
+
+          <Container className={isStudyMode ? 'max-w-none px-margin-mobile py-5 md:px-margin-desktop md:py-6' : ''}>
             <div
               className={
                 isStudyMode
                   ? hasLessonMedia
-                    ? 'mx-auto grid w-full max-w-none gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] xl:items-start'
-                    : 'mx-auto flex min-h-full w-full max-w-[900px] flex-col justify-center gap-6'
+                    ? 'mx-auto grid w-full max-w-[1600px] gap-6 xl:grid-cols-[minmax(420px,0.95fr)_minmax(0,1.05fr)] xl:items-start'
+                    : 'mx-auto flex w-full max-w-[940px] flex-col gap-6'
                   : 'mx-auto flex max-w-[860px] flex-col gap-6'
               }
             >
               {hasLessonMedia && (
-                <div className={isStudyMode ? 'xl:sticky xl:top-0' : ''}>
-                  <LessonMedia lesson={currentLesson} onAddVideoNote={(timestamp) => setVideoNoteTimestamp(timestamp ?? null)} />
-                </div>
-              )}
-              <LessonContent
-                lesson={currentLesson}
-                isStudyMode={isStudyMode}
-                onToggleStudyMode={handleToggleStudyMode}
-                articleRef={lessonContentRef}
-                onAddHighlightNote={setHighlightText}
-              />
-
-              <NoteComposer
-                lessonId={currentLesson.lesson_id}
-                noteType="text_note"
-                existingNote={textNote}
-                title="Lesson note"
-                placeholder="Grammar note, vocabulary tip, lesson summary..."
-                onSaved={handleNoteSaved}
-              />
-
-              {videoNotes.length > 0 && (
-                <section className="rounded-xl border border-outline-variant bg-white p-5 shadow-sm">
-                  <div className="flex items-center gap-2 text-title-md font-bold text-on-surface">
-                    <span className="material-symbols-outlined text-primary">movie</span>
-                    Video notes in this lesson
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {videoNotes.map((note) => (
-                      <button
-                        key={note.note_id}
-                        type="button"
-                        onClick={() => setVideoNoteTimestamp(note.video_timestamp_seconds ?? 0)}
-                        className="rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-label-md font-bold text-primary"
-                      >
-                        {Math.floor((note.video_timestamp_seconds ?? 0) / 60)}:{String((note.video_timestamp_seconds ?? 0) % 60).padStart(2, '0')} noted
-                      </button>
-                    ))}
-                  </div>
+                <section className={isStudyMode ? 'min-w-0 xl:self-start' : ''}>
+                  <LessonMedia
+                    lesson={currentLesson}
+                    videoNotes={videoNotes}
+                    onAddVideoNote={handleAddVideoNote}
+                    onEditVideoNote={(note) => setVideoNoteDraft({ timestamp: note.video_timestamp_seconds ?? 0, note })}
+                  />
                 </section>
               )}
+
+              <div className={isStudyMode && hasLessonMedia ? 'flex min-w-0 flex-col gap-6' : 'contents'}>
+                <LessonContent
+                  lesson={currentLesson}
+                  isStudyMode={isStudyMode}
+                  articleRef={lessonContentRef}
+                  onAddHighlightNote={setHighlightText}
+                  highlightNotes={highlightNotes}
+                />
+
+                <NoteComposer
+                  lessonId={currentLesson.lesson_id}
+                  noteType="text_note"
+                  existingNote={textNote}
+                  title="Lesson note"
+                  placeholder="Grammar note, vocabulary tip, lesson summary..."
+                  onSaved={handleNoteSaved}
+                  onDeleted={handleNoteDeleted}
+                />
 
               {highlightText && (
                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
@@ -422,6 +441,7 @@ export default function Lesson() {
                       title="Add highlight note"
                       compact
                       onSaved={handleNoteSaved}
+                      onDeleted={handleNoteDeleted}
                       onCreated={() => setHighlightText(null)}
                       onCancel={() => setHighlightText(null)}
                     />
@@ -429,63 +449,72 @@ export default function Lesson() {
                 </div>
               )}
 
-              {videoNoteTimestamp !== undefined && (
+              {videoNoteDraft && (
                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
                   <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
                     <NoteComposer
                       lessonId={currentLesson.lesson_id}
                       noteType="video_note"
-                      videoTimestampSeconds={videoNoteTimestamp ?? 0}
-                      existingNote={activeVideoNote}
-                      title="Add video note"
+                      videoTimestampSeconds={videoNoteDraft.timestamp ?? 0}
+                      existingNote={videoNoteDraft.note}
+                      title={videoNoteDraft.note ? 'Edit video note' : 'Add video note'}
                       compact
                       onSaved={handleNoteSaved}
-                      onCreated={() => setVideoNoteTimestamp(undefined)}
-                      onCancel={() => setVideoNoteTimestamp(undefined)}
+                      onDeleted={handleNoteDeleted}
+                      onCreated={() => setVideoNoteDraft(null)}
+                      onCancel={() => setVideoNoteDraft(null)}
                     />
                   </div>
                 </div>
               )}
 
-              {quizLoading && (
-                <section className="rounded-xl border border-outline-variant bg-white p-5 text-on-surface-variant shadow-sm">
-                  Loading quizzes...
-                </section>
-              )}
+                {quizLoading && (
+                  <section className="rounded-xl border border-outline-variant bg-white p-5 text-on-surface-variant shadow-sm">
+                    Loading quizzes...
+                  </section>
+                )}
 
-              {lessonQuiz && (
-                <section className={`rounded-xl border p-5 shadow-sm ${
-                  lessonQuizPassed
-                    ? 'border-emerald-300 bg-emerald-50'
-                    : 'border-amber-300 bg-amber-50'
-                }`}>
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className={`text-label-md font-bold uppercase tracking-wide ${
-                        lessonQuizPassed ? 'text-emerald-800' : 'text-amber-800'
-                      }`}>
-                        {lessonQuizPassed ? 'Lesson quiz passed' : 'Lesson quiz required'}
-                      </p>
-                      <h3 className="mt-1 text-headline-sm font-bold text-on-surface">{lessonQuiz.title}</h3>
-                      <p className="mt-1 text-body-md text-on-surface-variant">
-                        {lessonQuizPassed
-                          ? 'You can retake this quiz anytime. Your completed lesson status will stay completed.'
-                          : 'Pass this quiz in focus mode before marking the lesson complete.'}
-                      </p>
+                {lessonQuiz && (
+                  <section className={`rounded-xl border p-5 shadow-sm ${
+                    lessonQuizPassed
+                      ? 'border-emerald-300 bg-emerald-50'
+                      : 'border-amber-300 bg-amber-50'
+                  }`}>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className={`text-label-md font-bold uppercase tracking-wide ${
+                          lessonQuizPassed ? 'text-emerald-800' : 'text-amber-800'
+                        }`}>
+                          {lessonQuizPassed ? 'Lesson quiz passed' : 'Lesson quiz required'}
+                        </p>
+                        <h3 className="mt-1 text-headline-sm font-bold text-on-surface">{lessonQuiz.title}</h3>
+                        <p className="mt-1 text-body-md text-on-surface-variant">
+                          {lessonQuizPassed
+                            ? 'You can retake this quiz anytime. Your completed lesson status will stay completed.'
+                            : 'Pass this quiz in focus mode before marking the lesson complete.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/courses/${courseId}/lessons/${currentLesson.lesson_id}/quiz`)}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-bold text-on-primary"
+                      >
+                        <span className="material-symbols-outlined">quiz</span>
+                        {lessonQuizPassed ? 'Retake quiz' : 'Start quiz'}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/courses/${courseId}/lessons/${currentLesson.lesson_id}/quiz`)}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-bold text-on-primary"
-                    >
-                      <span className="material-symbols-outlined">quiz</span>
-                      {lessonQuizPassed ? 'Retake quiz' : 'Start quiz'}
-                    </button>
-                  </div>
-                </section>
-              )}
+                  </section>
+                )}
 
-              <div className={isStudyMode && hasLessonMedia ? 'xl:col-span-2' : ''}>
+              </div>
+
+              <div
+                className={
+                  isStudyMode && hasLessonMedia
+                    ? 'mx-auto w-full max-w-[900px] xl:col-span-2'
+                    : 'w-full'
+                }
+              >
                 {actionError && (
                   <p className="mb-3 rounded-lg bg-red-50 px-4 py-3 text-red-700">{actionError}</p>
                 )}

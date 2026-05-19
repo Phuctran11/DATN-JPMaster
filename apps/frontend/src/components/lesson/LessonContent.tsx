@@ -1,13 +1,13 @@
 import { useState, type RefObject } from 'react';
-import type { Lesson as LessonData } from '../../services/api';
+import type { Lesson as LessonData, LessonNote } from '../../services/api';
 import { Heading, Text } from '../ui/Typography';
 
 interface LessonContentProps {
   lesson: LessonData;
   isStudyMode: boolean;
-  onToggleStudyMode: () => void;
   articleRef: RefObject<HTMLElement | null>;
   onAddHighlightNote?: (selectedText: string) => void;
+  highlightNotes?: LessonNote[];
 }
 
 type LessonContentBlock =
@@ -84,10 +84,68 @@ const parseLessonContent = (content: string): LessonContentBlock[] => {
   return blocks;
 };
 
-export function LessonContent({ lesson, isStudyMode, onToggleStudyMode, articleRef, onAddHighlightNote }: LessonContentProps) {
+const renderHighlightedText = (text: string, highlightedTexts: string[]) => {
+  const validHighlights = highlightedTexts
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+
+  if (validHighlights.length === 0) return text;
+
+  const parts: Array<{ text: string; highlighted: boolean }> = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    let nextIndex = -1;
+    let nextHighlight = '';
+
+    for (const highlight of validHighlights) {
+      const index = text.indexOf(highlight, cursor);
+      if (index >= 0 && (nextIndex === -1 || index < nextIndex || (index === nextIndex && highlight.length > nextHighlight.length))) {
+        nextIndex = index;
+        nextHighlight = highlight;
+      }
+    }
+
+    if (nextIndex === -1) {
+      parts.push({ text: text.slice(cursor), highlighted: false });
+      break;
+    }
+
+    if (nextIndex > cursor) {
+      parts.push({ text: text.slice(cursor, nextIndex), highlighted: false });
+    }
+
+    parts.push({ text: text.slice(nextIndex, nextIndex + nextHighlight.length), highlighted: true });
+    cursor = nextIndex + nextHighlight.length;
+  }
+
+  return parts.map((part, index) =>
+    part.highlighted ? (
+      <mark
+        key={index}
+        className="rounded px-1 py-0.5 font-semibold"
+        style={{ backgroundColor: '#fde047', color: '#713f12', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}
+      >
+        {part.text}
+      </mark>
+    ) : (
+      <span key={index}>{part.text}</span>
+    )
+  );
+};
+
+export function LessonContent({
+  lesson,
+  isStudyMode,
+  articleRef,
+  onAddHighlightNote,
+  highlightNotes = [],
+}: LessonContentProps) {
   const contentText = normalizeLessonContent(lesson.content_text);
   const contentBlocks = contentText ? parseLessonContent(contentText) : [];
   const [selectionMenu, setSelectionMenu] = useState<{ text: string; x: number; y: number } | null>(null);
+  const highlightedTexts = highlightNotes.map((note) => note.selected_text ?? '').filter(Boolean);
 
   const handleTextAction = (action: 'translate' | 'note' | 'flashcard' | 'grammar') => {
     const selectedText = selectionMenu?.text || window.getSelection()?.toString().trim();
@@ -149,19 +207,6 @@ export function LessonContent({ lesson, isStudyMode, onToggleStudyMode, articleR
                 : 'Read carefully through the lesson notes and mark the lesson complete when you are ready.'}
             </Text>
           </div>
-          <button
-            type="button"
-            onClick={onToggleStudyMode}
-            aria-pressed={isStudyMode}
-            className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${
-              isStudyMode
-                ? 'border-primary bg-primary text-on-primary'
-                : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:border-primary hover:text-primary'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">{isStudyMode ? 'visibility_off' : 'visibility'}</span>
-            <span className="text-label-md font-label-md">{isStudyMode ? 'Exit study mode' : 'Study mode'}</span>
-          </button>
         </div>
       </header>
 
@@ -184,7 +229,7 @@ export function LessonContent({ lesson, isStudyMode, onToggleStudyMode, articleR
                   <ol key={index} className="list-decimal space-y-2 pl-6 text-body-lg font-body-lg leading-8 text-on-surface">
                     {block.items.map((item, itemIndex) => (
                       <li key={itemIndex} className="pl-1">
-                        {item}
+                        {renderHighlightedText(item, highlightedTexts)}
                       </li>
                     ))}
                   </ol>
@@ -196,7 +241,7 @@ export function LessonContent({ lesson, isStudyMode, onToggleStudyMode, articleR
                   <ul key={index} className="list-disc space-y-2 pl-6 text-body-lg font-body-lg leading-8 text-on-surface">
                     {block.items.map((item, itemIndex) => (
                       <li key={itemIndex} className="pl-1">
-                        {item}
+                        {renderHighlightedText(item, highlightedTexts)}
                       </li>
                     ))}
                   </ul>
@@ -206,7 +251,7 @@ export function LessonContent({ lesson, isStudyMode, onToggleStudyMode, articleR
               if (block.type === 'paragraph') {
                 return (
                   <p key={index} className="whitespace-pre-line text-body-lg font-body-lg leading-8 text-on-surface">
-                    {block.text}
+                    {renderHighlightedText(block.text, highlightedTexts)}
                   </p>
                 );
               }

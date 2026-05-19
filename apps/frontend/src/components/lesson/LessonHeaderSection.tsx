@@ -14,6 +14,7 @@ interface LessonHeaderSectionProps {
   sectionRef: RefObject<HTMLElement | null>;
   onBackToCourse: () => void;
   onToggleSidebar: () => void;
+  onToggleStudyMode: () => void;
 }
 
 export function LessonHeaderSection({
@@ -25,6 +26,7 @@ export function LessonHeaderSection({
   sectionRef,
   onBackToCourse,
   onToggleSidebar,
+  onToggleStudyMode,
 }: LessonHeaderSectionProps) {
   return (
     <section ref={sectionRef} className={`bg-surface py-stack-lg border-b border-outline-variant transition-all duration-300 ${isSidebarOpen ? 'md:ml-80' : 'md:ml-16'}`}>
@@ -39,8 +41,8 @@ export function LessonHeaderSection({
             <span className="material-symbols-outlined text-xl">{isSidebarOpen ? 'menu_open' : 'menu'}</span>
           </button>
         </div>
-        <div className="flex flex-col gap-stack-md md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-unit">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-unit">
             <Button
               variant="secondary"
               className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-outline-variant bg-surface-container-high px-4 py-2 text-on-surface shadow-sm transition-all hover:border-primary hover:bg-primary/10 hover:text-primary sm:w-fit"
@@ -52,24 +54,37 @@ export function LessonHeaderSection({
             <Heading level="h1" size="headline-lg" className="text-on-surface">
               {lesson.title}
             </Heading>
-            <div className="flex items-center gap-stack-md text-on-surface-variant">
-              <span className="flex items-center gap-1 font-label-md text-label-md">
-                <span className="material-symbols-outlined text-[18px]">schedule</span>
-                {formatLessonDuration(lesson.duration)}
-              </span>
-              <span className="flex items-center gap-1 font-label-md text-label-md">
-                <span className="material-symbols-outlined text-[18px]">menu_book</span>
-                {lesson.content_type}
-              </span>
+            <div className="flex flex-col gap-3 text-on-surface-variant sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex flex-wrap items-center gap-x-stack-md gap-y-2">
+                <span className="flex items-center gap-1 font-label-md text-label-md">
+                  <span className="material-symbols-outlined text-[18px]">schedule</span>
+                  {formatLessonDuration(lesson.duration)}
+                </span>
+                <span className="flex items-center gap-1 font-label-md text-label-md">
+                  <span className="material-symbols-outlined text-[18px]">menu_book</span>
+                  {lesson.content_type}
+                </span>
+              </div>
+              <div className="flex min-w-[180px] flex-1 items-center gap-3 sm:max-w-xs">
+                <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-container">
+                  <div className="h-full bg-primary" style={{ width: `${progressPercent}%` }} />
+                </div>
+                <span className="shrink-0 text-label-md font-label-md">
+                  {currentLessonNumber}/{totalLessons || 1}
+                </span>
+              </div>
             </div>
           </div>
-          <div className="hidden md:flex flex-col">
-            <div className="w-48 bg-surface-container h-2 rounded-full overflow-hidden">
-              <div className="bg-primary h-full" style={{ width: `${progressPercent}%` }} />
-            </div>
-            <p className="text-right font-label-md text-label-md mt-2 text-on-surface-variant">
-              Lesson {currentLessonNumber} of {totalLessons || 1}
-            </p>
+
+          <div className="flex w-full lg:w-auto lg:justify-end">
+            <button
+              type="button"
+              onClick={onToggleStudyMode}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-primary bg-primary px-5 py-2.5 font-bold text-on-primary shadow-sm transition-all hover:bg-primary/90 sm:w-fit"
+            >
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
+              Study mode
+            </button>
           </div>
         </div>
       </Container>
