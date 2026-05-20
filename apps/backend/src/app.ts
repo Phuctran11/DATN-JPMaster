@@ -10,6 +10,7 @@ import enrollmentRoutes from "./routes/enrollment.routes.js";
 import ratingRoutes from "./routes/rating.routes.js";
 import quizRoutes from "./routes/quiz.routes.js";
 import lessonNoteRoutes from "./routes/lessonNote.routes.js";
+import certificateRoutes from "./routes/certificate.routes.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 
 dotenv.config();
@@ -31,6 +32,7 @@ app.use("/api/purchases", purchaseRoutes);
 app.use("/api/ratings", ratingRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/lesson-notes", lessonNoteRoutes);
+app.use("/api/certificates", certificateRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

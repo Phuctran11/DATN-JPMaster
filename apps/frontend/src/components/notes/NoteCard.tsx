@@ -74,6 +74,8 @@ const formatTimestamp = (seconds: number) => {
 export function NoteCard({ note, onChanged, onDeleted }: NoteCardProps) {
   const toast = useToastMessages();
   const lessonHref = note.course_id && note.lesson_id ? `/courses/${note.course_id}/lessons/${note.lesson_id}` : undefined;
+  const courseHref = note.course_id ? `/courses/${note.course_id}` : undefined;
+  const finalTestHref = note.course_id && !note.lesson_id && note.quiz_type === 'final_test' ? `/courses/${note.course_id}` : undefined;
   const isHighlightNote = note.note_type === 'highlight';
   const typeStyle = noteTypeStyles[note.note_type];
   const highlightedText = isHighlightNote ? note.selected_text?.trim() || note.note_content : note.selected_text;
@@ -183,6 +185,16 @@ export function NoteCard({ note, onChanged, onDeleted }: NoteCardProps) {
           <Link to={lessonHref} className="inline-flex items-center gap-1 font-bold text-primary hover:underline">
             <span className="material-symbols-outlined text-[18px]">school</span>
             {note.lesson_title || `Lesson ${note.lesson_id}`}
+          </Link>
+        ) : finalTestHref ? (
+          <Link to={finalTestHref} className="inline-flex items-center gap-1 font-bold text-primary hover:underline">
+            <span className="material-symbols-outlined text-[18px]">assignment</span>
+            Final test question
+          </Link>
+        ) : courseHref && !note.lesson_id ? (
+          <Link to={courseHref} className="inline-flex items-center gap-1 font-bold text-primary hover:underline">
+            <span className="material-symbols-outlined text-[18px]">school</span>
+            Course question
           </Link>
         ) : note.lesson_id ? (
           <span>Lesson {note.lesson_id}</span>
